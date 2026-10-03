@@ -3,6 +3,8 @@ name = "slopfi"
 version = "0.1.0"
 description = "slopFi: import your bank statements, see where the money goes, and project where you could be. Local-first, SQLite, no cloud."
 requires-python = ">=3.12,<3.13"
+license = "WTFPL"
+license-files = ["LICENSE"]
 dependencies = [
     "pymupdf>=1.26",
     "fastapi>=0.115",

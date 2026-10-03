@@ -159,3 +159,11 @@ is used as a fallback (shown as a **From bank** badge) when no rule matches.
 
 Sign convention everywhere: negative = money leaving the family, including credit
 card spend. A credit card balance is stored as a negative balance.
+
+# Contribution
+Please don't. Fork and extend if you want to.
+
+# License
+Do wtf you want. Rip it off, sell it for billions I really couldn't give a shit.
+
+Officially: [WTFPL](LICENSE).

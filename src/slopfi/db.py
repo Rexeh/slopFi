@@ -1,4 +1,4 @@
-"""SQLite connection, schema and category seeding. Rules are not seeded: a new database has none."""
+"""SQLite connection, schema and seeding: categories, plus built-in rules once per database."""
 from __future__ import annotations
 
 import json
@@ -228,7 +228,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     if version < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-    seed_categories(conn)  # inserts only categories not already present; rules are never seeded
+    seed_categories(conn)  # inserts only categories not already present
+    seed_rules(conn)
 
 
 def _seed_file(name: str) -> list | dict:
@@ -252,6 +253,24 @@ def seed_categories(conn: sqlite3.Connection) -> None:
                     "INSERT OR IGNORE INTO categories (name, parent_id, kind, sort_order) VALUES (?, ?, ?, ?)",
                     (child, parent_id, top["kind"], sub_order),
                 )
+
+
+# Bump when seed/rules.json changes so existing databases pick up the new rules (duplicates are skipped).
+SEED_RULES_VERSION = 3
+
+
+def seed_rules(conn: sqlite3.Connection) -> None:
+    """Built-in rules for common UK trading names, added once per database. The names come from the lists banks
+    publish to explain unfamiliar statement entries (Nationwide, Lloyds/Halifax, RBS/NatWest, Bank of Ireland).
+
+    They sit at priority 200 (catch-alls like Amazon at 210) so manual (50) and imported (100) rules win. A built-in
+    rule the user deletes stays deleted until SEED_RULES_VERSION is bumped."""
+    from .rules_io import import_rules
+
+    if int(get_setting(conn, "seed_rules_version", "0")) >= SEED_RULES_VERSION:
+        return
+    import_rules(conn, _seed_file("rules.json"), source="seed")
+    set_setting(conn, "seed_rules_version", str(SEED_RULES_VERSION))
 
 
 def category_id_by_path(conn: sqlite3.Connection, path: str) -> int | None:

@@ -18,6 +18,12 @@ def _away_from_the_owners_files(tmp_path_factory):
         yield
 
 
+@pytest.fixture(autouse=True)
+def _no_built_in_rules(monkeypatch):
+    """Tests start with no rules and declare the ones they rely on; test_seed_rules covers the built-in set."""
+    monkeypatch.setattr(db, "SEED_RULES_VERSION", 0)
+
+
 @pytest.fixture
 def conn():
     c = db.connect(":memory:")

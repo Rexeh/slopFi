@@ -107,8 +107,10 @@ def test_database_is_dressed_for_every_page(demo):
         assert accounts == {"HSBC Joint": ("joint", "current"), "Monzo Alex": ("alex", "current"),
                             "Monzo pot: Savings": ("alex", "savings"), "Monzo pot: Rainy day": ("alex", "savings"),
                             "Monzo Sam": ("sam", "current"), "Amex Alex": ("alex", "credit_card")}
-        assert conn.execute("SELECT COUNT(*) FROM rules").fetchone()[0] == len(demo_build.DEMO_RULES) == demo.rules
-        assert 35 <= demo.rules <= 55
+        # every demo rule is present; one identical to a built-in rule is kept once, as the built-in
+        assert {r["pattern"].strip() for r in demo_build.DEMO_RULES} <= {r[0] for r in conn.execute("SELECT pattern FROM rules")}
+        assert conn.execute("SELECT COUNT(*) FROM rules").fetchone()[0] == demo.rules
+        assert 35 <= len(demo_build.DEMO_RULES) <= 55
         # rules cover most merchants but leave work for Review, in the open month too
         total, uncategorised = conn.execute("SELECT COUNT(*), SUM(category_id IS NULL) FROM transactions").fetchone()
         assert total > 1000 and 0 < uncategorised < total * 0.15

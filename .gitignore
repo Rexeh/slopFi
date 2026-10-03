@@ -26,5 +26,9 @@ rules.local.json
 # generated demo household (`slopfi demo`)
 /demo/
 
-# personal strings the test suite must never find in a published file (tests/test_no_personal_data.py)
+# personal strings (names, account numbers, address): local only, never commit
 pii.local.txt
+
+# docker: local settings and the default data folder
+.env
+docker-data/

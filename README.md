@@ -78,6 +78,40 @@ uv run slopfi import --account "Monzo Sam" --owner sam data/sam/monzo         # 
 The database is `slopfi.db` in the working directory (override with `SLOPFI_DB=path`).
 `data/` and `*.db` are git-ignored: they contain personal details.
 
+## Run with Docker
+
+For a home server. Everything personal lives in one host folder, mounted at `/data` in the container:
+the database (`slopfi.db`), `sources.toml`, `rules.local.json` and the statement folders. The image holds
+only the code, so rebuilding or deleting the container loses nothing.
+
+```bash
+cp .env.example .env              # choose the data folder, user, address and port
+mkdir -p ./docker-data            # or whatever SLOPFI_DATA_DIR says; create it first so it is owned by you
+docker compose up -d --build      # http://<host>:8000
+```
+
+| `.env` setting | Default | What it does |
+|---|---|---|
+| `SLOPFI_DATA_DIR` | `./docker-data` | Host folder mounted at `/data` |
+| `PUID` / `PGID` | `1000` | Host user and group the app runs as; must be able to write the data folder |
+| `SLOPFI_BIND` | `0.0.0.0` | Host address to listen on; `127.0.0.1` keeps it to this machine |
+| `SLOPFI_PORT` | `8000` | Host port |
+
+Lay the data folder out like the repo: `sources.toml` at the top, statements below it (paths in
+`sources.toml` are relative to that file, so `data/joint/hsbc` means `<data folder>/data/joint/hsbc`).
+Moving an existing setup across is a copy: `cp -r slopfi.db sources.toml rules.local.json data/ ./docker-data/`.
+
+The CLI works inside the container, against the same files:
+
+```bash
+docker compose exec slopfi slopfi sync
+docker compose exec slopfi slopfi rules export rules.local.json
+docker compose run --rm -p 8001:8000 slopfi serve --host 0.0.0.0 --demo   # demo on :8001, written to <data folder>/demo
+```
+
+Back up by copying the data folder (stop the container first, or use `sqlite3 slopfi.db .backup`).
+Published Docker ports skip ufw and firewalld, so `SLOPFI_BIND=0.0.0.0` is reachable by anything on your network.
+
 ## Using the app
 
 `uv run slopfi serve` and open http://127.0.0.1:8000. A sidebar on every page carries three groups and,

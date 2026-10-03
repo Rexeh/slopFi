@@ -1,0 +1,16 @@
+# docker compose up -d --build, then open http://<host>:8000.
+# Settings come from .env (copy .env.example); the defaults below apply when it is absent.
+
+services:
+  slopfi:
+    build: .
+    image: slopfi:latest
+    container_name: slopfi
+    restart: unless-stopped
+    # Run as the owner of the data folder so the database and exports stay editable on the host.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    ports:
+      - "${SLOPFI_BIND:-0.0.0.0}:${SLOPFI_PORT:-8000}:8000"
+    volumes:
+      # The host folder holding slopfi.db, sources.toml, rules.local.json and your statements.
+      - "${SLOPFI_DATA_DIR:-./docker-data}:/data"

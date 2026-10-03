@@ -1,0 +1,18 @@
+# Only the code goes into the image; personal data is mounted at runtime.
+.git
+.venv
+.pytest_cache
+**/__pycache__
+.env
+data/
+demo/
+docker-data/
+*.db
+*.db-*
+*.sqlite
+sources.toml
+rules.local.json
+pii.local.txt
+tests/
+scripts/
+assets/

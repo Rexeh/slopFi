@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Spending{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('spending.css') }}">{% endblock %}
+{% block content %}
+{% set t = view.table if view else none %}
+<div class="page-head">
+  <div>
+    <h1>Spending</h1>
+    <p class="status-line">{% if view %}<b>{{ view.scope.period }}</b> against {{ view.scope.compared }}. Averages over the period; one-offs are {{ 'included' if include_one_off else 'left out' }}.{% else %}What is changing, and where the levers are.{% endif %}</p>
+  </div>
+  <form method="get" action="/spending" class="tools" aria-label="Period and account">
+    <label>Period
+      <select name="months">
+        {% for n in (3, 6, 12) %}<option value="{{ n }}" {{ 'selected' if n == months }}>Last {{ n }} months</option>{% endfor %}
+      </select>
+    </label>
+    {% if accounts | length > 1 %}
+    <label>Account
+      <select name="account_id">
+        <option value="">All accounts</option>
+        {% for a in accounts %}<option value="{{ a.id }}" {{ 'selected' if account_id|string == a.id|string }}>{{ a.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <button class="btn" type="submit">Apply</button>
+    <details class="menu options" id="options">
+      <summary class="btn-quiet">{{ icon('settings', small=True) }}Options{{ icon('chevron-down', small=True) }}</summary>
+      <div class="menu-list options-list">
+        <label class="check"><input type="checkbox" name="include_partial" value="1" {{ 'checked' if include_partial }}> Include months with gaps</label>
+        <label class="check"><input type="checkbox" name="include_one_off" value="1" {{ 'checked' if include_one_off }}> Include one-offs ({{ one_off_count }})</label>
+        <p class="small muted">Applied with the period.</p>
+      </div>
+    </details>
+  </form>
+</div>
+
+{% if not view %}
+<section class="panel empty">
+  <span class="empty-icon">{{ icon('spending') }}</span>
+  <h2>No complete month yet</h2>
+  <p>Import more statements, or tick <b>Include months with gaps</b> under Options.</p>
+  <a class="btn" href="/statements">{{ icon('upload', small=True) }}Go to Statements</a>
+</section>
+{% else %}
+{% set totals = t.totals %}
+<dl class="dl-inline scope" aria-label="Coverage">
+  <div><dt>Period</dt><dd>{{ view.scope.period }}</dd></div>
+  <div><dt>Gaps</dt><dd>
+    {% for c in view.scope.gaps %}{{ c.month | month_label }} {% if c.closed %}<span class="badge">Closed</span>{% else %}<span class="badge badge-warning">Partial</span>{% endif %} {{ (c.gaps + c.missing) | join(', ') }}{{ '; ' if not loop.last }}{% else %}None{% endfor %}
+    {% if view.scope.gaps and not (view.scope.gaps | selectattr('closed') | list | length == view.scope.gaps | length) %}<a href="/review">Close the month on Review</a>{% endif %}
+  </dd></div>
+  <div><dt>Compared with</dt><dd>{{ view.scope.compared }}{% if view.scope.compared_short %} ({{ t.prev_months | length }} month{{ 's' if t.prev_months | length != 1 }} only){% endif %}</dd></div>
+</dl>
+
+<section class="strip strip-3" aria-label="Period summary">
+  <div class="strip-item"><span class="strip-label">Average spending</span><span class="figure">{{ fmt.compact(totals.avg_outgoings) }}</span>
+    <span class="strip-note">A month. Income {{ fmt.money(totals.avg_income) }}, net {{ fmt.signed(totals.avg_net) }} a month.</span></div>
+  <div class="strip-item"><span class="strip-label">Savings rate</span><span class="figure">{{ (totals.savings_rate | pct) if totals.savings_rate is not none else '—' }}</span>
+    <span class="strip-note">Net divided by income. The one number that says whether the fund is growing.</span></div>
+  <div class="strip-item"><span class="strip-label">Spending targets</span>
+    <span class="figure {{ 'figure-muted' if not view.targets_summary.count }}">{% if view.targets_summary.count %}{{ view.targets_summary.count }} set{% else %}None set{% endif %}</span>
+    <span class="strip-note">{% if view.targets_summary.count %}{{ fmt.money(view.targets_summary.total) }} a month in all; {{ view.targets_summary.over }} over target last month. <a href="#targets">Review targets</a>{% else %}<a href="#targets">Set targets</a> for the two or three largest flexible categories.{% endif %}</span></div>
+</section>
+
+<section class="panel spending-panel">
+  <div class="tabs" role="tablist" aria-label="Spending views">
+    {% for key, label in (('categories', 'Categories'), ('fixed', 'Fixed costs'), ('targets', 'Targets'), ('ideas', 'Savings ideas')) %}
+    <button type="button" role="tab" id="tab-{{ key }}" aria-controls="panel-{{ key }}" aria-selected="{{ 'true' if tab == key else 'false' }}" {% if tab != key %}tabindex="-1"{% endif %}>{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  {# ------------------------------------------------------------ Categories #}
+  <div role="tabpanel" id="panel-categories" aria-labelledby="tab-categories" {% if tab != 'categories' %}hidden{% endif %}>
+    <div class="panel-head"><h2 class="section-title">Six largest categories, this period against the last</h2>
+      {% if view.multiples.charts %}<div class="tools"><button type="button" class="btn-quiet" aria-pressed="false" aria-controls="twin-multiples" data-table-toggle="multiples">{{ icon('table', small=True) }}<span>Table</span></button></div>{% endif %}</div>
+    <div class="multiples" id="chart-multiples-wrap">
+      {% for m in view.multiples.charts %}
+      <div class="multiple">
+        <h3><span>{{ m.name }}</span><b>{{ fmt.money(m.avg) }} avg</b></h3>
+        <div class="chart-wrap multiple-chart"><canvas id="sm-{{ loop.index0 }}" data-index="{{ loop.index0 }}" role="img" aria-label="{{ m.label }}"></canvas>
+          {% if m.prev_label %}<span class="ref-label" data-ref-label="{{ loop.index0 }}" aria-hidden="true">{{ m.prev_label }}</span>{% endif %}</div>
+      </div>
+      {% else %}
+      <p class="small muted">No categorised spending in this period yet.</p>
+      {% endfor %}
+    </div>
+    {% if view.multiples.charts %}
+    <div id="twin-multiples" class="table-scroll chart-twin" hidden><table class="data">
+      <thead><tr><th scope="col">Category</th>{% for l in view.multiples.labels %}<th scope="col" class="num">{{ l }}</th>{% endfor %}<th scope="col" class="num">{{ view.scope.compared }} average</th></tr></thead>
+      <tbody>{% for m in view.multiples.charts %}<tr><td>{{ m.name }}</td>{% for v in m['values'] %}<td class="num">{{ fmt.money(v) }}</td>{% endfor %}<td class="num">{{ fmt.money(m.prev_avg) if m.prev_avg is not none else '—' }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+    <p class="chart-footnote" id="legend-multiples">Line: monthly spending, {{ fmt.span_label(view.multiples.months) }}. Grey rule: the {{ view.scope.compared }} average. All six share one scale.</p>
+
+    <div class="panel-head section-head"><h2>Spending by category</h2>
+      <details class="disclosure disclosure-sm"><summary>How these columns are worked out</summary><p class="small ink-2">Average is per month over the period. The change compares this period's average with the one before it; when the earlier figure is under £50 the previous amount is shown instead of a percentage. Share is of all categorised spending. Fixed is the share paid by direct debit or standing order. Targets are set on the Targets tab.</p></details></div>
+    <div class="table-scroll"><table class="data cat-table" id="cat-table">
+      <thead><tr><th scope="col">Category</th><th scope="col">Trend</th><th scope="col" class="num">Average</th><th scope="col" class="num">Last month</th><th scope="col" class="num">vs {{ view.scope.prev_header }}</th><th scope="col" class="num">Share</th><th scope="col" class="num" data-priority="low">Fixed</th></tr></thead>
+      <tbody>
+      {% for c in t.categories %}
+        {% set cid = c.id if c.id is not none else 'uncat' %}
+        <tr class="top" id="cat-{{ cid }}">
+          <td><a href="{{ '/transactions?uncategorised=1' if c.id is none else '/transactions?category_id=' ~ c.id ~ '&account_id=' ~ account_id }}">{{ c.name }}</a>
+            {% for tone, label in c.badges %} <span class="badge {{ 'badge-warning' if tone == 'warning' }}">{{ label }}</span>{% endfor %}
+            {% if c.children %} <button type="button" class="toggle-sub" aria-expanded="false" data-sub="{{ cid }}" aria-controls="{% for s in c.children %}sub-{{ cid }}-{{ s.id }} {% endfor %}">{{ icon('chevron-right', small=True) }}{{ c.children | length }} sub-categor{{ 'y' if c.children | length == 1 else 'ies' }}</button>{% endif %}</td>
+          <td><svg class="spark" viewBox="0 0 96 24" role="img" aria-label="{{ c.spark.label }}"><polyline points="{{ c.spark.points }}"/><circle r="4" cx="{{ c.spark.end[0] }}" cy="{{ c.spark.end[1] }}"/></svg></td>
+          <td class="num">{{ fmt.money(c.avg) }}</td>
+          <td class="num">{{ fmt.money(c.last) }}</td>
+          <td class="num change {{ c.change_view.tone }}"{% if c.change_view.title %} title="{{ c.change_view.title }}"{% endif %}>{% if c.change_view.tone %}{{ icon('arrow-up' if c.change > 0 else 'arrow-down', small=True) }}{% endif %}{{ c.change_view.text }}{% if c.change_view.detail %} <span class="muted">{{ c.change_view.detail }}</span>{% endif %}</td>
+          <td class="num share"><svg class="share-bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect x="{{ 100 - c.share_bar }}" y="0" width="{{ c.share_bar }}" height="10" rx="1"/></svg><span>{{ c.share | pct }}</span></td>
+          <td class="num" data-priority="low">{{ c.fixed_share | pct }}</td>
+        </tr>
+        {% for s in c.children %}
+        <tr class="sub" id="sub-{{ cid }}-{{ s.id }}" data-sub-of="{{ cid }}" hidden>
+          <td><a href="/transactions?category_id={{ s.id }}&account_id={{ account_id }}">{{ s.name }}</a></td>
+          <td><svg class="spark" viewBox="0 0 96 24" role="img" aria-label="{{ s.spark.label }}"><polyline points="{{ s.spark.points }}"/><circle r="4" cx="{{ s.spark.end[0] }}" cy="{{ s.spark.end[1] }}"/></svg></td>
+          <td class="num">{{ fmt.money(s.avg) }}</td><td class="num">{{ fmt.money(s.last) }}</td><td class="num"></td>
+          <td class="num">{{ s.share | pct }}</td><td class="num" data-priority="low">{{ s.fixed_share | pct }}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="2">All spending</td><td class="num">{{ fmt.money(totals.table_avg) }}</td><td class="num">{{ fmt.money(totals.table_last) }}</td><td class="num"></td><td class="num">100%</td><td class="num" data-priority="low"></td></tr></tfoot>
+    </table></div>
+    <p class="chart-footnote"><span class="badge">Flexible</span> changes with habits. <span class="badge badge-warning">Spiky</span> one month was more than double the average; check for a one-off. Changes under £50 are shown without colour.</p>
+
+    <div class="panel-head section-head"><h2>Spending by category, month by month</h2>
+      <button type="button" class="btn-quiet" aria-pressed="false" aria-controls="twin-matrix" data-table-toggle="matrix">{{ icon('table', small=True) }}<span>Table</span></button></div>
+    <div class="chart-wrap matrix-chart" id="chart-matrix-wrap"><canvas id="chart-matrix" role="img" aria-label="Stacked monthly spending for the six largest categories, other categories and uncategorised, {{ fmt.span_label(view.matrix.months) }}; {{ fmt.money(view.matrix.totals[-1]) }} in {{ view.matrix.months[-1] | month_label }}. The table has the figures."></canvas></div>
+    <div class="legend" id="legend-matrix" aria-hidden="true"></div>
+    <div id="twin-matrix" class="table-scroll chart-twin" hidden><table class="data">
+      <thead><tr><th scope="col">Category</th>{% for l in view.matrix.labels %}<th scope="col" class="num">{{ l }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for s in view.matrix.series %}<tr><td>{{ s.name }}</td>{% for v in s['values'] %}<td class="num">{{ fmt.money(v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      <tfoot><tr><td>All spending</td>{% for v in view.matrix.totals %}<td class="num">{{ fmt.money(v) }}</td>{% endfor %}</tr></tfoot>
+    </table></div>
+
+    <h2 class="section-title section-head">Month by month</h2>
+    <div class="table-scroll"><table class="data">
+      <thead><tr><th scope="col"><span class="visually-hidden">Measure</span></th>{% for m in chosen %}<th scope="col" class="num">{{ m | month_label }}</th>{% endfor %}<th scope="col" class="num">Average</th></tr></thead>
+      <tbody>
+        <tr><td>Spending</td>{% for v in totals.outgoings %}<td class="num">{{ fmt.money(v) }}</td>{% endfor %}<td class="num">{{ fmt.money(totals.avg_outgoings) }}</td></tr>
+        <tr><td>Income</td>{% for v in totals.income %}<td class="num">{{ fmt.money(v) }}</td>{% endfor %}<td class="num">{{ fmt.money(totals.avg_income) }}</td></tr>
+        <tr><td>Net</td>{% for v in totals.net %}<td class="num {{ 'neg' if v < 0 else 'pos' }}">{{ fmt.signed(v) }}</td>{% endfor %}<td class="num {{ 'neg' if totals.avg_net < 0 else 'pos' }}">{{ fmt.signed(totals.avg_net) }}</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  {# ------------------------------------------------------------ Fixed costs #}
+  <div role="tabpanel" id="panel-fixed" aria-labelledby="tab-fixed" {% if tab != 'fixed' %}hidden{% endif %}>
+    <h2 class="section-title">Fixed costs</h2>
+    {% set fx = view.fixed %}
+    {% if fx.rows %}
+    <p class="small ink-2">Direct debits, standing orders and card payments with a stable amount, seen in two or more months. About {{ fmt.money(fx.total) }} a month in all; {{ fmt.money(fx.fixed_total) }} of it is direct debits and standing orders, which change by switching provider, not by habit.</p>
+    <div class="table-scroll"><table class="data fixed-table">
+      <thead><tr><th scope="col">Payee</th><th scope="col">Type</th><th scope="col">Category</th><th scope="col" class="num">Months</th><th scope="col" class="num">Average</th><th scope="col">Last paid</th><th scope="col" class="num">Per month</th></tr></thead>
+      <tbody>
+      {% for i in fx.rows %}
+        <tr>
+          <td><a href="/transactions?q={{ i.merchant | urlencode }}&month=all">{{ i.merchant }}</a></td>
+          <td class="nowrap">{{ i.type_label }}</td>
+          <td>{% if i.category %}{{ i.category | replace(' / ', ', ') }}{% else %}<a class="badge badge-warning" href="/transactions?uncategorised=1&q={{ i.merchant | urlencode }}&month=all">Uncategorised</a>{% endif %}</td>
+          <td class="num">{{ i.months }}</td>
+          <td class="num">{{ fmt.money(i.avg) }}</td>
+          <td class="nowrap">{{ i.last_label }}</td>
+          <td class="num">{{ fmt.money(i.per_month) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="6">All repeat payments ({{ fx.count }} payee{{ 's' if fx.count != 1 }})</td><td class="num">{{ fmt.money(fx.total) }}</td></tr></tfoot>
+    </table></div>
+    {% else %}
+    <div class="empty"><span class="empty-icon">{{ icon('refresh') }}</span><h3>No repeat payments yet</h3><p>A payee counts once it appears in two different months. Import another month of statements and this fills in.</p></div>
+    {% endif %}
+  </div>
+
+  {# ---------------------------------------------------------------- Targets #}
+  <div role="tabpanel" id="panel-targets" aria-labelledby="tab-targets" {% if tab != 'targets' %}hidden{% endif %}>
+    <h2 class="section-title">Spending targets</h2>
+    {% if not view.targets_summary.count %}
+    <div class="empty targets-empty"><span class="empty-icon">{{ icon('todo') }}</span><h3>No targets yet</h3><p>A target is a monthly ceiling for a category. Start with the two or three flexible categories with the largest averages; small cuts there beat big cuts in small categories.</p></div>
+    {% else %}
+    <p class="small ink-2">Over target compares last month with the target. The month-close checklist flags any category over its target.</p>
+    {% endif %}
+    <div class="table-scroll"><table class="data targets-table">
+      <thead><tr><th scope="col">Category</th><th scope="col" class="num">Average</th><th scope="col" class="num">Last month</th><th scope="col">Monthly target</th><th scope="col">Over target</th></tr></thead>
+      <tbody>
+      {% for r in view.targets %}
+        {% set ek = 'target_' ~ r.id %}
+        <tr{% if r.target is not none %} class="has-target"{% endif %}>
+          <td>{{ r.name }}{% for tone, label in r.badges %} <span class="badge {{ 'badge-warning' if tone == 'warning' }}">{{ label }}</span>{% endfor %}</td>
+          <td class="num">{{ fmt.money(r.avg) }}</td>
+          <td class="num">{{ fmt.money(r.last) }}</td>
+          <td class="target-cell">
+            <form method="post" action="/budgets/{{ r.id }}" class="inline target-form">
+              <input type="hidden" name="next" value="{{ next_url }}#targets">
+              <label class="visually-hidden" for="{{ ek }}">Monthly target for {{ r.name }}</label>
+              <input id="{{ ek }}" name="target" class="w-8ch" inputmode="decimal" placeholder="£" value="{{ form[ek] if ek in form else ('%.0f' % r.target if r.target is not none else '') }}"{% if errors[ek] %} aria-invalid="true" aria-describedby="err-{{ ek }}"{% endif %}>
+              <button type="submit" class="btn btn-sm">Set</button>
+              {% if errors[ek] %}<span class="field-error" id="err-{{ ek }}">{{ errors[ek] }}</span>{% endif %}
+            </form>
+          </td>
+          <td class="over-cell">
+            {% if r.bullet %}
+            <span class="bullet-wrap"><svg class="bullet-bar" aria-hidden="true" preserveAspectRatio="none"><rect class="bullet-track" x="0" y="3" width="100%" height="8"/><rect class="bullet-actual {{ 'is-over' if r.over > 0 }}" x="0" y="3" width="{{ r.bullet.actual }}%" height="8"/><rect class="bullet-tick" x="{{ r.bullet.tick }}%" y="0" width="2" height="14"/></svg>
+            <span class="num {{ 'neg' if r.over > 0 else 'pos' }}">{{ fmt.signed(r.over) if r.over > 0 else 'Under by ' ~ fmt.money(-r.over) }}</span></span>
+            {% else %}<span class="muted small">Appears once set</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <p class="chart-footnote">Leave a target blank and choose Set to remove it. Once set, Over target shows last month as a bar against the target mark, here and on Overview.</p>
+  </div>
+
+  {# ------------------------------------------------------------ Savings ideas #}
+  <div role="tabpanel" id="panel-ideas" aria-labelledby="tab-ideas" {% if tab != 'ideas' %}hidden{% endif %}>
+    <h2 class="section-title">Where to look first</h2>
+    <p class="small ink-2">Ranked by likely monthly saving. Suggestions, not decisions.</p>
+    <ol class="ideas">
+      {% for o in view.ideas %}
+      <li><a href="{{ o.href }}">{{ o.title }}</a><span class="saving">{% if o.saving %}about {{ fmt.money(o.saving) }} a month{% endif %}</span><p>{{ o.detail }}</p></li>
+      {% else %}
+      <li><span>Nothing to suggest yet.</span><span class="saving"></span><p>Ideas appear once a period has categorised spending.</p></li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+<details class="disclosure how-to"><summary>How to use Spending</summary>
+  <ul class="small ink-2">
+    <li>Use averages over a period, not single months. Spending is lumpy; the 3-month average is the baseline, and 6 and 12 months show direction and seasonality.</li>
+    <li>Separate fixed from flexible. Fixed bills change by switching; flexible categories change by habit. Target them differently.</li>
+    <li>Mark genuine one-offs on Transactions so a holiday or a car repair does not look like a trend.</li>
+    <li>Set a target per category, then watch Over target.</li>
+    <li>The savings rate (net divided by income) is the single number that says whether the house-move fund is growing.</li>
+  </ul>
+</details>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if view %}
+<script id="spending-data" type="application/json">{{ {"multiples": view.multiples, "matrix": view.matrix} | tojson }}</script>
+<script src="{{ static_url('vendor/chart.umd.js') }}"></script>
+<script src="{{ static_url('spending.js') }}" defer></script>
+{% endif %}
+{% endblock %}

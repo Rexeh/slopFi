@@ -1,0 +1,21 @@
+/* Review: the month-close checklist as a page. Tokens and the .step rows come from style.css. */
+.review-panel { padding-bottom: var(--space-4); }
+.review-progress { font-size: var(--text-table); color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+.review-steps { margin-bottom: 0; }
+.review-steps .step { grid-template-columns: 28px minmax(0, 1fr) auto; gap: var(--space-4); padding: var(--space-4) 0; }
+.review-steps .step-icon { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 50%; background: var(--color-surface-tint); }
+.review-steps .step.is-done .step-icon { background: var(--color-positive-tint); }
+.review-steps .step.is-todo .step-icon { background: var(--color-warning-tint); }
+.review-steps .step-body h3 { font-size: var(--text-md); }
+.review-steps .step-body p { margin-top: var(--space-1); color: var(--color-ink-2); max-width: 80ch; overflow-wrap: anywhere; }
+.review-steps .step.is-done .step-body p { color: var(--color-ink-3); }
+.step-action { white-space: nowrap; gap: var(--space-1); }
+.step-action .icon { transition: transform var(--duration-fast) var(--ease-enter); }
+.step-action:hover .icon { transform: translateX(2px); }
+.review-foot { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--color-border-strong); }
+.review-foot .small { max-width: 60ch; }
+table.closed-months { max-width: 480px; }
+@media (max-width: 768px) {
+  .review-steps .step { grid-template-columns: 28px minmax(0, 1fr); }
+  .review-steps .step-action { grid-column: 2; justify-self: start; padding-left: 0; }
+}

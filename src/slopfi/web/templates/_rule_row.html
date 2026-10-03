@@ -1,0 +1,21 @@
+{# One rule row; also the htmx fragment returned by POST /rules/{id}/toggle. Context: r. #}
+<tr id="rule-{{ r.id }}" class="{{ 'disabled' if not r.enabled }}">
+  <td class="num">{{ r.priority }}</td>
+  <td>{{ r.match_label }}</td>
+  <td class="pattern"><code>{{ r.pattern }}</code>{% if not r.enabled %} <span class="badge muted">Disabled</span>{% endif %}</td>
+  <td>{{ r.type_code or '' }}</td>
+  <td class="nowrap">{{ r.amount_label }}</td>
+  <td>{{ r.category }}</td>
+  <td><span class="badge muted">{{ r.source_label }}</span></td>
+  <td class="num">{{ r.n_txn }}</td>
+  <td>
+    <button type="button" class="switch" role="switch" aria-checked="{{ 'true' if r.enabled else 'false' }}" aria-label="Rule {{ r.pattern }} enabled"
+            id="rule-{{ r.id }}-switch" hx-post="/rules/{{ r.id }}/toggle" hx-target="#rule-{{ r.id }}" hx-swap="outerHTML"><span class="switch-knob"></span></button>
+  </td>
+  <td class="actions">
+    <form method="post" action="/rules/{{ r.id }}/delete" class="inline" data-confirm="Delete rule {{ r.pattern }}?"
+          data-confirm-detail="It filed {{ r.n_txn }} transaction{{ '' if r.n_txn == 1 else 's' }}; they keep their category. This can't be undone.">
+      <button class="btn-quiet danger row-edit" aria-label="Delete rule {{ r.pattern }}">{{ icon('trash', small=True) }}Delete</button>
+    </form>
+  </td>
+</tr>

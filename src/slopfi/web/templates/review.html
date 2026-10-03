@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Review{% if checklist.month %} · {{ checklist.month | month_label }}{% endif %}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('review.css') }}">{% endblock %}
+{% block content %}
+{% set c = checklist %}
+<div class="page-head">
+  <div>
+    <h1>Review{% if c.month %} · {{ c.month | month_label(true) }}{% endif %}</h1>
+    <p class="status-line">
+      {% if not c.month %}Nothing to review yet.
+      {% elif c.closed %}<b>{{ c.month | month_name }} is closed.</b> Spending and the Overview treat it as finished; reopen it to change anything.
+      {% elif c.can_close %}<b>Every step is done.</b> Close {{ c.month | month_name }} when you are ready.
+      {% else %}<b>{{ c.month | month_name }} is open.</b> {{ c.left }} of {{ c.total }} step{{ '' if c.total == 1 else 's' }} left before it can be closed.{% endif %}
+    </p>
+  </div>
+  {% if months %}
+  <form method="get" action="/review" class="tools" aria-label="Choose a month">
+    <label class="field">Month
+      <select name="month">
+        {% for m in months %}<option value="{{ m }}" {{ 'selected' if m == c.month }}>{{ m | month_label }}{% if m in c.closed_months %} · closed{% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn">Apply</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if not c.month %}
+<section class="panel empty">
+  <span class="empty-icon">{{ icon('upload') }}</span>
+  <h2>Nothing imported yet</h2>
+  <p>Import your first statement and the month-close steps appear here.</p>
+  <a class="btn btn-primary" href="/statements">{{ icon('upload', small=True) }}Go to Statements</a>
+</section>
+{% else %}
+<section class="panel review-panel" aria-labelledby="review-steps-title">
+  <div class="panel-head">
+    <h2 id="review-steps-title">{{ 'Closed with every step done' if c.closed and c.done == c.total else ('Before you close ' ~ (c.month | month_name)) }}</h2>
+    <div class="tools"><span class="review-progress" aria-label="{{ c.done }} of {{ c.total }} steps done">{{ c.done }} of {{ c.total }} done</span></div>
+  </div>
+  <ol class="steps review-steps">
+  {% for s in c.steps %}
+    <li class="step {{ 'is-done' if s.done else 'is-todo' }}" id="step-{{ s.key }}">
+      <span class="step-icon">{{ icon('check' if s.done else 'todo', title=('Done' if s.done else 'To do')) }}</span>
+      <div class="step-body">
+        <h3>{{ s.title }}</h3>
+        <p>{{ s.detail }}</p>
+      </div>
+      <a class="btn-quiet step-action" href="{{ s.href }}">{{ s.action }}{{ icon('chevron-right', small=True) }}</a>
+    </li>
+  {% endfor %}
+  </ol>
+  <div class="review-foot">
+  {% if c.closed %}
+    <form method="post" action="/review/reopen" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><button type="submit" class="btn-quiet">Reopen {{ c.month | month_name }}</button></form>
+    <span class="small muted">Reopening puts {{ c.month | month_name }} back on the checklist; nothing else changes.</span>
+  {% else %}
+    <form method="post" action="/review/close" class="inline"><input type="hidden" name="month" value="{{ c.month }}">
+      <button type="submit" class="btn btn-primary" {{ 'disabled' if not c.can_close }} aria-describedby="close-why-page">{{ icon('check', small=True) }}Close {{ c.month | month_name }}</button></form>
+    <span id="close-why-page" class="small muted">{% if c.can_close %}Closing marks {{ c.month | month_name }} as finished for Spending and the Overview.{% else %}Enabled once every step is done.{% endif %}</span>
+  {% endif %}
+  </div>
+</section>
+{% if c.closed_months %}
+<section class="panel">
+  <div class="panel-head"><h2>Closed months</h2></div>
+  <table class="data closed-months">
+    <thead><tr><th scope="col">Month</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>{% for m in c.closed_months %}<tr><td><a href="/review?month={{ m }}">{{ m | month_label(true) }}</a></td>
+      <td class="actions"><form method="post" action="/review/reopen" class="inline"><input type="hidden" name="month" value="{{ m }}"><button type="submit" class="btn-quiet" aria-label="Reopen {{ m | month_label(true) }}">Reopen</button></form></td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

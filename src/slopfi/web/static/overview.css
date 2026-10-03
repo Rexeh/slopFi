@@ -1,0 +1,44 @@
+/* Overview page: strip details, chart tooltip keys and legend, share bars, the before-you-close rows. Tokens only. */
+.strip-delta .icon { width: 16px; height: 16px; }
+.strip-delta.muted { font-weight: var(--weight-regular); }
+.strip-pct { font-weight: var(--weight-regular); color: var(--color-ink-3); margin-left: var(--space-1); }
+.strip-note a { color: var(--color-accent); }
+.btn-inline { display: inline; min-height: 0; height: auto; padding: 0; font-size: inherit; font-weight: var(--weight-medium); vertical-align: baseline; }
+.fund-form { display: flex; align-items: flex-end; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-border); }
+.fund-form .field-error { flex-basis: 100%; }
+
+/* chart tooltip and legend keys */
+.chart-tip { min-width: 140px; }
+.tip-title { font-size: var(--text-sm); color: var(--color-ink-2); margin-bottom: 2px; }
+.tip-row { display: flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.tip-row b { font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.tip-row span { color: var(--color-ink-2); }
+.tip-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--key, var(--chart-1)); flex: none; }
+.tip-key.tip-line { height: 2px; width: 14px; border-radius: 1px; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); color: var(--color-ink-2); margin-top: var(--space-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-wrap canvas { max-width: 100%; }
+.chart-twin { margin-top: var(--space-2); }
+[data-table-toggle] .icon { margin-right: 2px; }
+
+/* against-typical table: five columns in the 2fr seat, so the global 7.5em numeric minimum is dropped */
+table.typical td.num { min-width: 0; }
+table.typical th, table.typical td { padding-left: 6px; padding-right: 6px; }
+table.typical td a .small { font-weight: var(--weight-regular); }
+.diff { display: inline-flex; align-items: center; gap: 1px; font-weight: var(--weight-semibold); }
+.diff .icon { width: 14px; height: 14px; }
+.share-cell { white-space: nowrap; }
+.share-cell span { display: inline-block; min-width: 3ch; }
+.share-bar { display: inline-block; width: 36px; height: 10px; margin-right: 6px; vertical-align: -1px; fill: var(--ramp-4); background: var(--color-surface-tint); border-radius: 2px; }
+table.data tr.is-selected td a { font-weight: var(--weight-semibold); }
+
+/* before-you-close rows */
+.close-steps .step-title { white-space: nowrap; font-weight: var(--weight-medium); }
+.close-steps .step-title .icon { color: var(--color-warning); margin-right: 6px; }
+.close-steps td:nth-child(2) { color: var(--color-ink-2); }
+.close-steps td.num { min-width: 0; }
+.panel .empty h3 { font-size: var(--text-md); margin-bottom: var(--space-1); }
+
+@media (max-width: 768px) {
+  .strip .figure { font-size: var(--text-xl); }
+}

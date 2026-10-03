@@ -1,0 +1,28 @@
+{# Rules tab of the Categories page. Context: rules, uncategorised. The add-rule dialog lives in categories.html. #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Rules</h2>
+    <div class="tools">
+      <form method="post" action="/rules/apply" class="inline">
+        <label class="check small"><input type="checkbox" name="recategorise" value="1"> Also redo transactions filed by rules</label>
+        <button type="submit" class="btn">{{ icon('refresh') }}Apply to uncategorised{% if uncategorised %} ({{ uncategorised }}){% endif %}</button>
+      </form>
+      <a class="btn" href="/rules/export" download="slopfi-rules.json" data-export-rules data-count="{{ rules | length }}">{{ icon('download') }}Export rules</a>
+      <button type="button" class="btn" data-dialog="#import-rules">{{ icon('upload') }}Import rules</button>
+      <button type="button" class="btn btn-primary" data-dialog="#add-rule">{{ icon('plus') }}Add a rule</button>
+    </div>
+  </div>
+  <p class="panel-note rules-note">Rules are tried in priority order, lowest number first, and the first match files the transaction. Transactions you filed by hand are never changed.
+    <b>Manual</b> rules were made here or from a transaction; <b>Imported</b> ones came from a rules file. A disabled rule is kept but not used.
+    Export rules saves them all as a JSON file you can keep (for example as <code>rules.local.json</code>) and import again.</p>
+  <div class="table-scroll">
+  <table class="data rules">
+    <thead><tr><th scope="col" class="num">Priority</th><th scope="col">Match</th><th scope="col">Pattern</th><th scope="col">Bank code</th><th scope="col">Amount</th><th scope="col">Category</th><th scope="col">Source</th><th scope="col" class="num">Used</th><th scope="col">Enabled</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for r in rules %}{% include "_rule_row.html" %}{% else %}
+    <tr><td colspan="10"><div class="empty"><span class="empty-icon">{{ icon('categories') }}</span><h3>No rules yet</h3><p>Add one here, tick Make a rule on a transaction, or import a rules file.</p></div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>

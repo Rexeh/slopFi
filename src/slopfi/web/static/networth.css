@@ -1,0 +1,77 @@
+/* Net worth page (Phase 3). Tokens only; components come from style.css. */
+.strip-delta .icon-sm { margin-right: 2px; }
+.sub-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); font-size: var(--text-base); font-weight: var(--weight-semibold); margin: var(--space-5) 0 var(--space-2); }
+.sub-head { margin: var(--space-5) 0 var(--space-2); align-items: center; }
+.sub-head .sub-title { margin: 0; }
+.sub-title .muted { font-weight: var(--weight-regular); font-size: var(--text-table); }
+.section-head { margin-top: var(--space-6); }
+.panel-head h2 { font-size: var(--text-md); }
+details.disclosure-sm > summary { font-size: var(--text-table); font-weight: var(--weight-medium); color: var(--color-accent); }
+details.disclosure-sm[open] > summary { margin-bottom: var(--space-2); }
+details.mortgage { margin-top: var(--space-5); }
+details.mortgage > summary { color: var(--color-ink); font-weight: var(--weight-semibold); font-size: var(--text-base); }
+details.mortgage .facts { margin-top: var(--space-2); }
+details.mortgage .facts dd { font-size: var(--text-base); }
+
+/* composition and history */
+.composition-chart { height: 120px; }
+.history-chart { height: 220px; }
+/* tooltip keys and DOM legend, as on Overview */
+.chart-tip { min-width: 140px; }
+.tip-title { font-size: var(--text-sm); color: var(--color-ink-2); margin-bottom: 2px; }
+.tip-row { display: flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.tip-row b { font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.tip-row span { color: var(--color-ink-2); }
+.tip-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--key, var(--chart-1)); flex: none; }
+.tip-key.tip-line { height: 2px; width: 14px; border-radius: 1px; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); color: var(--color-ink-2); margin-top: var(--space-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+[data-table-toggle] .icon { margin-right: 2px; }
+.chart-twin { margin-top: var(--space-2); }
+.btn-inline { display: inline; min-height: 0; height: auto; padding: 0; font-size: inherit; vertical-align: baseline; }
+
+.history-table { max-width: 360px; }
+.history-empty { padding: var(--space-2) 0 0; }
+.history-empty h4 { font-size: var(--text-base); margin-bottom: var(--space-1); }
+.history-empty p { max-width: 60ch; }
+
+/* LTV meter: fill ramp-2 on the track, ticks at the lender bands; the track edge keeps it visible in dark */
+.meter { overflow: visible; }
+.meter-svg { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 4px; overflow: hidden; }
+.meter-fill { fill: var(--ramp-2); }
+.meter i.at-60 { left: 60%; } .meter i.at-75 { left: 75%; } .meter i.at-85 { left: 85%; }
+
+/* accounts in update mode */
+.accounts-table .editing { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.accounts-table td.num .editing { justify-content: flex-end; }
+.accounts-table tr.is-editing { background: var(--color-surface-tint); }
+.accounts-table td.updated { line-height: 1.3; }
+.accounts-table td.updated .badge { margin-top: 2px; }
+.holdings-table .kind-line { display: block; font-size: var(--text-sm); color: var(--color-ink-3); font-weight: var(--weight-regular); }
+.row-actions .row-edit { min-height: 26px; }
+.balances-actions { margin-top: var(--space-3); gap: var(--space-3); flex-wrap: wrap; }
+.row-actions { text-align: right; white-space: nowrap; }
+.row-actions .row-edit { display: inline-flex; align-items: center; gap: 2px; }
+.holdings-table td .empty, .accounts-table td .empty { padding: var(--space-2) 0; }
+
+/* asset dialog */
+dialog.holding-dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: var(--space-5) var(--space-6) var(--space-6); border: 0; border-radius: var(--radius-md); background: var(--color-surface-raised); color: var(--color-ink); box-shadow: var(--shadow-3); }
+dialog.holding-dialog::backdrop { background: var(--backdrop); }
+dialog.holding-dialog .form-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3) var(--space-5); }
+dialog.holding-dialog .form-grid .field input:not(.w-6ch):not(.w-8ch), dialog.holding-dialog .form-grid .field select { width: 100%; }
+dialog.holding-dialog h2 { margin: 0; }
+.dialog-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.dialog-close { width: 32px; padding: 0; color: var(--color-ink-3); }
+.dialog-group { border: 0; padding: var(--space-3) 0 0; margin: var(--space-4) 0 0; border-top: 1px solid var(--color-border); }
+.dialog-group legend { padding: 0 var(--space-2) 0 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-ink-2); }
+.dialog-group-help { grid-column: 1 / -1; }
+.dialog-notes { display: flex; flex-direction: column; gap: 3px; margin-top: var(--space-4); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink-2); }
+.dialog-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
+.dialog-foot .actions { margin-left: auto; }
+.dialog-foot form { margin: 0; }
+.field-help { font-weight: var(--weight-regular); }
+
+@media (max-width: 768px) {
+  .dialog-foot { flex-wrap: wrap; }
+  .row-actions .row-edit { opacity: 1; }
+}

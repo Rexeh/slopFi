@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Categories and rules{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('setup.css') }}">{% endblock %}
+{% block content %}
+{% set n_sub = tree | map(attribute='children') | map('length') | sum %}
+{% set tab = tab | default('categories') %}
+<div class="page-head">
+  <div>
+    <h1>Categories and rules</h1>
+    <p class="status-line"><b>{{ tree | length }} categories</b> with {{ n_sub }} sub-categories; <b>{{ rules | length }} rules</b>{% if n_disabled %}, {{ n_disabled }} disabled{% endif %}.
+      {% if uncategorised %}<a href="/transactions?month=all&uncategorised=1">{{ uncategorised }} transaction{{ '' if uncategorised == 1 else 's' }} still to categorise</a>{% else %}Everything is filed.{% endif %}</p>
+  </div>
+</div>
+
+<div class="tabs" role="tablist" aria-label="Categories and rules">
+  <button type="button" role="tab" id="tab-categories" aria-controls="panel-categories" aria-selected="{{ 'true' if tab == 'categories' else 'false' }}" {% if tab != 'categories' %}tabindex="-1"{% endif %}>Categories</button>
+  <button type="button" role="tab" id="tab-rules" aria-controls="panel-rules" aria-selected="{{ 'true' if tab == 'rules' else 'false' }}" {% if tab != 'rules' %}tabindex="-1"{% endif %}>Rules</button>
+</div>
+
+<div role="tabpanel" id="panel-categories" aria-labelledby="tab-categories" {% if tab != 'categories' %}hidden{% endif %}>
+<section class="panel">
+  <div class="panel-head"><h2>All categories</h2><div class="tools"><button type="button" class="btn btn-primary" data-dialog="#add-category">{{ icon('plus') }}Add a category</button></div></div>
+  <div class="table-scroll">
+  <table class="data categories">
+    <thead><tr><th scope="col">Category</th><th scope="col">Type</th><th scope="col" class="num">Transactions</th><th scope="col" class="num">Rules</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for t in tree %}{% for c in [t] + t.children %}
+      <tr class="{{ 'top' if c is sameas t else 'sub' }}" id="cat-{{ c.id }}">
+        <td>{{ c.name }}</td><td>{{ c.kind_label }}</td>
+        <td class="num">{% if c.n_txn %}<a href="/transactions?month=all&category_id={{ c.id }}">{{ c.n_txn }}</a>{% else %}0{% endif %}</td>
+        <td class="num">{{ c.n_rules }}</td>
+        <td class="actions">
+          <button type="button" class="btn-quiet row-edit" data-edit="cat-edit-{{ c.id }}" aria-label="Rename {{ c.path }}">{{ icon('edit', small=True) }}Rename</button>
+          {% if c.in_use %}
+          <button type="button" class="btn-quiet danger row-edit" disabled aria-describedby="cat-why-{{ c.id }}">{{ icon('trash', small=True) }}Delete</button>
+          <span class="row-edit in-use" id="cat-why-{{ c.id }}">In use: {{ c.in_use }}</span>
+          {% else %}
+          <form method="post" action="/categories/{{ c.id }}/delete" class="inline" data-confirm="Delete {{ c.path }}?" data-confirm-detail="It has no transactions and no rules. This can't be undone.">
+            <button class="btn-quiet danger row-edit" aria-label="Delete {{ c.path }}">{{ icon('trash', small=True) }}Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      <tr id="cat-edit-{{ c.id }}" class="is-editing edit-row {{ 'sub' if c is not sameas t }}" hidden>
+        <td><label class="field"><span class="visually-hidden">New name for {{ c.path }}</span><input name="name" form="cat-form-{{ c.id }}" value="{{ c.name }}" required class="w-24ch"></label></td>
+        <td>{{ c.kind_label }}</td><td class="num">{{ c.n_txn }}</td><td class="num">{{ c.n_rules }}</td>
+        <td class="actions">
+          <button type="submit" form="cat-form-{{ c.id }}" class="btn btn-sm">Save</button>
+          <button type="button" class="btn-quiet" data-cancel="cat-{{ c.id }}">Cancel</button>
+        </td>
+      </tr>
+    {% endfor %}{% else %}
+      <tr><td colspan="5"><div class="empty"><span class="empty-icon">{{ icon('categories') }}</span><h3>No categories yet</h3><p>Add one to start filing transactions.</p></div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% for t in tree %}{% for c in [t] + t.children %}<form id="cat-form-{{ c.id }}" method="post" action="/categories/{{ c.id }}/rename"></form>{% endfor %}{% endfor %}
+  <p class="panel-note">Type is set on the top-level category and shared by its sub-categories. A category in use (transactions, rules or sub-categories) can't be deleted until they are moved or removed.</p>
+</section>
+</div>
+
+<div role="tabpanel" id="panel-rules" aria-labelledby="tab-rules" {% if tab != 'rules' %}hidden{% endif %}>
+{% include "_rules.html" %}
+</div>
+
+<dialog class="form-dialog" id="add-category" aria-labelledby="add-category-title">
+  <form method="post" action="/categories" class="stack">
+    <h2 id="add-category-title">Add a category</h2>
+    <label class="field">Name <input name="name" required autocomplete="off"></label>
+    <label class="field">Parent
+      <select name="parent_id">
+        <option value="">None (top level)</option>
+        {% for t in tree %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+      <span class="field-help">A sub-category takes its parent's type.</span>
+    </label>
+    <label class="field">Type
+      <select name="kind">{% for v, l in category_kinds.items() %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+    </label>
+    <div class="actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn btn-primary">Add category</button></div>
+  </form>
+</dialog>
+
+<dialog class="form-dialog" id="add-rule" aria-labelledby="add-rule-title" {% if errors %}data-open{% endif %}>
+  <form method="post" action="/rules" class="stack">
+    <h2 id="add-rule-title">Add a rule</h2>
+    <label class="field">Pattern
+      <input name="pattern" required autocomplete="off" placeholder="TESCO" value="{{ form.pattern or '' }}"{% if errors.pattern %} aria-invalid="true" aria-describedby="err-pattern"{% endif %}>
+      {% if errors.pattern %}<span class="field-error" id="err-pattern">{{ errors.pattern }}</span>{% else %}<span class="field-help">Matched against the description, ignoring case.</span>{% endif %}
+    </label>
+    <label class="field">Match
+      <select name="match_type">{% for v, l in match_types.items() %}<option value="{{ v }}" {{ 'selected' if form.match_type == v }}>{{ l }}</option>{% endfor %}</select>
+    </label>
+    <label class="field">Category
+      <select name="category_id">{% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if form.category_id|string == c.id|string }}>{{ c.label }}</option>{% endfor %}</select>
+    </label>
+    <div class="form-row">
+      <label class="field">Bank code <input name="type_code" class="w-6ch" placeholder="Any" value="{{ form.type_code or '' }}"><span class="field-help">DD, CARD, FP…</span></label>
+      {% for key, label in [('amount_min', 'Amount from'), ('amount_max', 'Amount to')] %}
+      <label class="field">{{ label }}
+        <input name="{{ key }}" class="num w-8ch" inputmode="decimal" placeholder="£" value="{{ form[key] or '' }}"{% if errors[key] %} aria-invalid="true" aria-describedby="err-{{ key }}"{% endif %}>
+        {% if errors[key] %}<span class="field-error" id="err-{{ key }}">{{ errors[key] }}</span>{% endif %}
+      </label>
+      {% endfor %}
+      <label class="field">Priority
+        <input name="priority" class="num w-4ch" inputmode="numeric" value="{{ form.priority if 'priority' in form else 50 }}"{% if errors.priority %} aria-invalid="true" aria-describedby="err-priority"{% endif %}>
+        {% if errors.priority %}<span class="field-error" id="err-priority">{{ errors.priority }}</span>{% endif %}
+      </label>
+    </div>
+    <p class="field-help">Money out is negative, so "Amount to −50" means payments of £50 or more. Lower priority numbers are tried first.</p>
+    <div class="actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn btn-primary">Add rule</button></div>
+  </form>
+</dialog>
+
+<dialog class="form-dialog" id="import-rules" aria-labelledby="import-rules-title">
+  <form method="post" action="/rules/import" enctype="multipart/form-data" class="stack" id="import-rules-form"
+        data-confirm="Import rules from this file?" data-confirm-label="Import rules" data-confirm-kind="primary"
+        data-confirm-detail="Rules already here are kept and duplicates are skipped. Uncategorised transactions are filed by the new rules."
+        data-replace-detail="This deletes all {{ rules | length }} rules here first, then imports the file and re-files transactions that rules had filed. This can't be undone.">
+    <h2 id="import-rules-title">Import rules</h2>
+    <label class="field">Rules file
+      <input type="file" name="file" accept=".json,application/json" required>
+      <span class="field-help">A JSON file from Export rules or <code>slopfi rules export</code>. A missing sub-category is created under its parent.</span>
+    </label>
+    <label class="check"><input type="checkbox" name="replace" value="1" id="import-replace"> Replace all {{ rules | length }} existing rules</label>
+    <div class="actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn btn-primary">{{ icon('upload') }}Import</button></div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('setup.js') }}" defer></script>{% endblock %}

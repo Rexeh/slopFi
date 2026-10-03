@@ -1,0 +1,73 @@
+/* Setup pages: Accounts and statements, Categories and rules. Tokens and components come from style.css. */
+
+/* page head: the sync form sits beside the title with its checkbox first */
+.sync-form { align-items: center; }
+
+/* import panel */
+.formats { margin: var(--space-3) 0 0; padding-left: var(--space-5); font-size: var(--text-table); color: var(--color-ink-2); columns: 2; column-gap: var(--space-8); }
+.formats li { margin-bottom: var(--space-1); break-inside: avoid; }
+.formats b { font-weight: var(--weight-medium); color: var(--color-ink); }
+.results-list { list-style: none; margin: var(--space-4) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--color-border); font-size: var(--text-table); }
+.result { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-1) 0; }
+.result .icon { margin-top: 1px; color: var(--color-ink-3); }
+.result-imported .icon { color: var(--color-positive); }
+.result-error .icon { color: var(--color-negative); }
+.result-pruned .icon { color: var(--color-warning); }
+.result-warnings { margin: var(--space-1) 0 0; padding-left: var(--space-4); color: var(--color-ink-3); font-size: var(--text-sm); }
+
+/* tables */
+table.statements td .type, table.accounts td .type { display: block; }
+.file { overflow-wrap: anywhere; }
+table.statements td:first-child { max-width: 360px; min-width: 200px; }
+table.rules td.num, table.categories td.num, table.accounts td.num { min-width: 5em; }
+table.rules td.pattern { max-width: 260px; overflow-wrap: anywhere; }
+table.rules code { white-space: pre-wrap; }
+.edit-row td { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+.edit-row .field { gap: 0; }
+.edit-row input, .edit-row select { max-width: 100%; }
+.in-use { font-size: var(--text-sm); color: var(--color-ink-3); white-space: nowrap; }
+.rules-note { margin: calc(-1 * var(--space-1)) 0 var(--space-3); max-width: 90ch; }
+
+/* switch: a 36×20 track, knob 14px, 3:1 edge in both schemes */
+.switch { position: relative; width: 36px; height: 20px; min-height: 20px; padding: 0; border-radius: 10px; border: 1px solid var(--color-border-strong); background: var(--color-surface-raised); box-shadow: none; cursor: pointer; vertical-align: middle; }
+.switch:hover { box-shadow: none; border-color: var(--color-ink-3); }
+.switch:active { background: var(--color-surface-raised); }
+.switch-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--color-border-strong); transition: transform var(--duration-fast) var(--ease-enter), background-color var(--duration-fast) var(--ease-enter); }
+.switch[aria-checked="true"] { background: var(--color-accent); border-color: var(--color-accent); }
+.switch[aria-checked="true"] .switch-knob { background: var(--color-accent-ink); transform: translateX(16px); }
+.switch[aria-checked="true"]:hover { background: color-mix(in oklab, var(--color-accent), black 8%); }
+.switch[aria-checked="true"]:active { background: color-mix(in oklab, var(--color-accent), black 14%); }
+tr.disabled .switch { border-color: var(--color-border-strong); }
+
+/* form dialogs: the add-category and add-rule forms */
+dialog.form-dialog { width: min(480px, calc(100vw - 32px)); padding: var(--space-5); border: 0; border-radius: var(--radius-md); background: var(--color-surface-raised); color: var(--color-ink); box-shadow: var(--shadow-3); }
+dialog.form-dialog::backdrop { background: var(--backdrop); }
+dialog.form-dialog .stack { max-width: none; margin-bottom: 0; align-items: stretch; }
+dialog.form-dialog h2 { margin-bottom: var(--space-1); }
+dialog.form-dialog .form-row { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: flex-start; }
+dialog.form-dialog .form-row .field { width: auto; }
+dialog.form-dialog p.field-help { margin: 0; }
+dialog.form-dialog .actions { justify-content: flex-end; margin-top: var(--space-2); }
+
+@media (max-width: 1024px) {
+  .formats { columns: 1; }
+}
+@media (max-width: 768px) {
+  .sync-form { align-items: flex-start; flex-direction: column; }
+  .sync-form .check { white-space: normal; }
+  table.statements td:first-child { max-width: 200px; min-width: 160px; }
+  table.statements td.num { min-width: 0; }
+  table.statements td.nowrap { white-space: normal; }
+  .file { display: block; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .in-use { display: none; }                       /* still the disabled Delete's description; the note explains */
+}
+@media (forced-colors: active) {
+  .switch[aria-checked="true"] { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
+  .switch[aria-checked="true"] .switch-knob { background: HighlightText; }
+}
+
+/* Settings > Household: the name and add-a-person forms put the button beside the field */
+.household-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); margin: 0 0 var(--space-4); }
+.household-form .btn { margin-top: calc(var(--text-sm) * 1.4 + 3px); }
+.household-people-h { margin: var(--space-2) 0 var(--space-2); }
+table.people { margin-bottom: var(--space-4); }

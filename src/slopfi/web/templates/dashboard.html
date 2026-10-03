@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Overview{% if month %} · {{ month | month_label }}{% endif %}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('overview.css') }}">{% endblock %}
+{% macro delta(value, good_when_down=False, pts=False) -%}
+  {%- if value is none -%}<span class="strip-delta muted">—</span>
+  {%- elif value | abs < 0.5 -%}<span class="strip-delta muted">no change</span>
+  {%- else -%}
+    {%- set up = value > 0 -%}
+    {%- set good = (not up) if good_when_down else up -%}
+    <span class="strip-delta {{ 'pos' if good else 'neg' }}">{{ icon('arrow-up' if up else 'arrow-down', small=True) }}{% if pts %}{{ '+' if up else '−' }}{{ '%.0f' % (value | abs) }} pts{% else %}{{ value | money_delta }}{% endif %}{{ caller() if caller }}</span>
+  {%- endif -%}
+{%- endmacro %}
+{% macro share_bar(share, top) -%}
+  {#- Scaled to the largest share so the bars are readable; the percentage beside it carries the value. -#}
+  <svg class="share-bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect width="{{ '%.1f' % (100 * share / top if top else 0) }}" height="10" rx="1"/></svg>
+{%- endmacro %}
+{% block content %}
+{% if not has_data %}
+  <div class="page-head"><div><h1>Overview</h1></div></div>
+  <section class="panel empty">
+    <span class="empty-icon">{{ icon('upload') }}</span>
+    <h2>Nothing imported yet</h2>
+    <p>Import your first statement and this page fills in.</p>
+    <a class="btn btn-primary" href="/statements">{{ icon('upload', small=True) }}Go to Statements</a>
+  </section>
+{% else %}
+{% set txn = "/transactions?month=" ~ month ~ "&account_id=" ~ account_id %}
+{% set typ_label = against.typical_label %}
+{% set top_share = against.rows | map(attribute="share") | max if against.rows else 0 %}
+<div class="page-head">
+  <div>
+    <h1>Overview · {{ month | month_label(true) }}</h1>
+    <p class="status-line">
+      {%- if status.state == 'closed' %}<b>{{ status.name }} is closed.</b> <a href="/review?month={{ status.month }}">Reopen it from Review</a>
+      {%- elif status.state == 'ready' %}<b>{{ status.name }} is ready to close.</b> Every step is done. <a href="/review?month={{ status.month }}">Close the month</a>
+      {%- elif status.state == 'open' %}<b>{{ status.name }} is open.</b>
+        {%- for strong, rest in status.facts %}{{ ', and ' if loop.index > 1 else ' ' }}<b>{{ strong }}</b>{{ rest }}{% endfor %}{{ '.' if status.facts }}
+        <a href="/review?month={{ status.month }}">Finish the month close</a>
+      {%- else %}Nothing to review yet.{% endif %}
+    </p>
+  </div>
+  <form method="get" action="/" class="tools" aria-label="Filters">
+    <label class="field">Month
+      <select name="month" id="month">
+        {% for m in months %}<option value="{{ m }}" {{ 'selected' if m == month }}>{{ m | month_label }}{{ ' (partial)' if m in partial_months }}</option>{% endfor %}
+      </select>
+    </label>
+    {% if show_accounts %}
+    <label class="field">Account
+      <select name="account_id" id="account_id">
+        <option value="">All accounts</option>
+        {% for a in accounts %}<option value="{{ a.id }}" {{ 'selected' if account_id|string == a.id|string }}>{{ a.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <button type="submit" class="btn">Apply</button>
+  </form>
+</div>
+
+<section class="strip" aria-label="Headline figures">
+  <div class="strip-item">
+    <span class="strip-label">Spending</span>
+    <span class="figure">{{ spending | money_tile }}</span>
+    {% call delta(spending_diff, good_when_down=True) %}{% if spending_pct is not none %} <span class="strip-pct">{{ spending_pct | pct(true) }}</span>{% endif %}{% endcall %}
+    <span class="strip-note">{% if typical %}vs typical {{ against.typical_total | money_tile }}, the {{ typ_label }} average{% else %}No earlier months to compare with yet{% endif %}</span>
+  </div>
+  <div class="strip-item">
+    <span class="strip-label">Savings rate</span>
+    <span class="figure">{{ (savings_rate | pct).replace('-', '−') if savings_rate is not none else '—' }}</span>
+    {{ delta(rate_diff_pts, pts=True) }}
+    <span class="strip-note">{% if savings_rate is none %}No income this month{% elif typical_rate is not none %}vs typical {{ (typical_rate | pct).replace('-', '−') }}, the {{ typ_label }} average · income minus spending, over income{% else %}Income minus spending, over income{% endif %}</span>
+  </div>
+  <div class="strip-item">
+    <span class="strip-label">Net worth</span>
+    <span class="figure">{{ net_worth.total | money_tile if (net_worth.has_holdings or net_worth.has_balances) else '—' }}</span>
+    {% if net_worth.change is not none %}{{ delta(net_worth.change) }}
+      <span class="strip-note">since the {{ net_worth.since | date_label }} snapshot · liquid {{ net_worth.liquid | money_tile }}</span>
+    {% elif net_worth.date %}<span class="strip-delta muted">First snapshot</span>
+      <span class="strip-note">{{ net_worth.date | date_label }} · liquid {{ net_worth.liquid | money_tile }}</span>
+    {% else %}<span class="strip-delta muted">No snapshot yet</span>
+      <span class="strip-note">Add assets and balances on <a href="/networth">Net worth</a></span>{% endif %}
+  </div>
+  <div class="strip-item">
+    <span class="strip-label">House-move fund</span>
+    <span class="figure">{{ fund.value | money_tile }}</span>
+    {% if fund.target %}<span class="strip-delta {{ 'pos' if fund.progress >= 1 else '' }}">{{ fund.progress | pct }} of {{ fund.target | money_tile }}</span>
+      <span class="strip-note">Cash, pots, ISAs and stocks · <button type="button" class="btn-quiet btn-inline" data-reveal="fund-form">Change target</button></span>
+    {% else %}<span class="strip-delta muted">No target yet</span>
+      <span class="strip-note">Cash, pots, ISAs and stocks · <button type="button" class="btn-quiet btn-inline" data-reveal="fund-form">Set a target</button></span>{% endif %}
+    <form method="post" action="/overview/fund-target" class="fund-form" id="fund-form" {{ '' if errors.fund_target else 'hidden' }}>
+      <input type="hidden" name="month" value="{{ month }}"><input type="hidden" name="account_id" value="{{ account_id }}">
+      <label class="field">Target
+        <input name="target" class="w-12ch" inputmode="decimal" placeholder="£" value="{{ form.fund_target if 'fund_target' in form else ('%.0f' % fund.target if fund.target else '') }}"{% if errors.fund_target %} aria-invalid="true" aria-describedby="err-fund_target"{% endif %}>
+      </label>
+      <button type="submit" class="btn btn-sm">Save target</button>
+      {% if errors.fund_target %}<span class="field-error" id="err-fund_target">{{ errors.fund_target }}</span>{% endif %}
+    </form>
+  </div>
+</section>
+
+<section class="bench">
+  <div class="panel" id="panel-where">
+    <div class="panel-head"><h2>Where {{ month | month_name }} went</h2>
+      <div class="tools"><span class="muted">{{ spending | money_tile }} across {{ against.count }} transactions</span>
+        {% if against.rows %}<button type="button" class="btn-quiet btn-sm" data-table-toggle="where" aria-pressed="false" aria-controls="twin-where">{{ icon('table', small=True) }}<span>Table</span></button>{% endif %}</div></div>
+    {% if against.rows %}
+    <div class="chart-wrap" id="chart-where-wrap" data-rows="{{ against.rows | length }}">
+      <canvas id="chart-where" role="img" aria-label="Where {{ month | month_name }} went: {{ spending | money_tile }} across {{ against.rows | length }} categories; largest {{ against.rows[0].name }} {{ against.rows[0].spend | money_tile }}. Figures are in the table alongside."></canvas>
+    </div>
+    <div class="table-scroll chart-twin" id="twin-where" hidden>
+      <table class="data">
+        <thead><tr><th scope="col">Category</th><th scope="col" class="num">{{ month | month_name }}</th><th scope="col" class="num">Share</th></tr></thead>
+        <tbody>{% for r in against.rows %}<tr><td>{{ r.name }}</td><td class="num">{{ r.spend | money_whole }}</td><td class="num">{{ r.share | pct }}</td></tr>{% endfor %}</tbody>
+        <tfoot><tr><td>Total</td><td class="num">{{ spending | money_whole }}</td><td class="num">100%</td></tr></tfoot>
+      </table>
+    </div>
+    <p class="panel-note">Transfers between your own accounts are excluded. Uncategorised is shown in grey until it is filed.</p>
+    {% else %}
+    <div class="empty"><span class="empty-icon">{{ icon('spending') }}</span><h3>No spending in {{ month | month_label }} yet</h3><p>Import a statement covering this month and the chart fills in.</p></div>
+    {% endif %}
+  </div>
+  <div class="panel" id="panel-typical">
+    <div class="panel-head"><h2>Against typical</h2>
+      <div class="tools"><span class="muted">{% if typical %}Typical = {{ typ_label }} average{% else %}No earlier months yet{% endif %}</span></div></div>
+    {% if against.rows %}
+    <div class="table-scroll">
+    <table class="data typical">
+      <thead><tr><th scope="col">Category</th><th scope="col" class="num">{{ month | month_name }}</th><th scope="col" class="num">Typical</th><th scope="col" class="num">Difference</th><th scope="col" class="num">Share</th></tr></thead>
+      <tbody>
+      {% for r in against.rows %}
+        <tr>
+          <td><a href="{{ txn }}{% if r.uncategorised %}&uncategorised=1{% else %}&category_id={{ r.id }}{% endif %}">{{ r.name }}</a>{% if r.uncategorised and r.n %} <span class="small muted">{{ r.n }} to file</span>{% endif %}</td>
+          <td class="num">{{ r.spend | money_whole }}</td>
+          <td class="num">{{ r.typical | money_whole if r.typical is not none else '—' }}</td>
+          <td class="num">{% if r.state == 'about' %}<span class="muted">about typical</span>{% elif r.state %}<span class="{{ 'neg' if r.state == 'up' else 'pos' }} diff">{{ icon('arrow-up' if r.state == 'up' else 'arrow-down', small=True) }}{{ r.diff | money_delta }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="num share-cell">{{ share_bar(r.share, top_share) }}<span>{{ r.share | pct }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td>Total</td><td class="num">{{ spending | money_whole }}</td><td class="num">{{ against.typical_total | money_whole if against.typical_total is not none else '—' }}</td>
+        <td class="num">{% if against.total_state == 'about' %}<span class="muted">about typical</span>{% elif against.total_state %}<span class="{{ 'neg' if against.total_state == 'up' else 'pos' }} diff">{{ icon('arrow-up' if against.total_state == 'up' else 'arrow-down', small=True) }}{{ against.total_diff | money_delta }}</span>{% else %}—{% endif %}</td><td class="num">100%</td></tr></tfoot>
+    </table>
+    </div>
+    <p class="panel-note">Typical is the average of the three months before {{ month | month_name }} ({{ typ_label }}); under £50 either way counts as about typical.</p>
+    {% else %}
+    <p class="panel-note">Nothing to compare yet.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="bench even">
+  <div class="panel" id="panel-six">
+    <div class="panel-head"><h2>Six months</h2>
+      <div class="tools"><button type="button" class="btn-quiet btn-sm" data-table-toggle="six" aria-pressed="false" aria-controls="twin-six">{{ icon('table', small=True) }}<span>Table</span></button></div></div>
+    <div class="chart-wrap" id="chart-six-wrap">
+      <canvas id="chart-six" role="img" aria-label="Spending and income per month, {{ months6[0].month | month_label }} to {{ months6[-1].month | month_label }}; {{ month | month_label }} spending {{ spending | money_tile }}. Figures are in the table alongside."></canvas>
+    </div>
+    <div class="legend" id="legend-six" aria-hidden="true"></div>
+    <div class="table-scroll chart-twin" id="twin-six" hidden>
+      <table class="data">
+        <thead><tr><th scope="col">Month</th><th scope="col" class="num">Spending</th><th scope="col" class="num">Income</th><th scope="col" class="num">3-month average</th></tr></thead>
+        <tbody>{% for m in months6 | reverse %}<tr><td>{{ m.month | month_label }}{% if m.partial %} <span class="badge badge-warning">Partial</span>{% endif %}</td><td class="num">{{ m.outgoings | money_whole }}</td><td class="num">{{ m.income | money_whole }}</td><td class="num">{{ m.avg3 | money_whole if m.avg3 is not none else '—' }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    <p class="panel-note">{% if partial_months %}{{ partial_months | map('month_label') | join(' and ') }} {{ 'is' if partial_months | length == 1 else 'are' }} partly covered, drawn hatched and left out of the average.{% else %}Every month is fully covered.{% endif %} The line is the average spending of the full months among the latest three.</p>
+  </div>
+  <div class="panel" id="panel-months">
+    <div class="panel-head"><h2>Month by month</h2></div>
+    <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th scope="col">Month</th><th scope="col" class="num">Spending</th><th scope="col" class="num">Income</th><th scope="col" class="num">Net</th></tr></thead>
+      <tbody>
+      {% for m in months6 | reverse %}
+        <tr{% if m.month == month %} class="is-selected"{% endif %}><td><a href="/?month={{ m.month }}&account_id={{ account_id }}">{{ m.month | month_label }}</a>{% if m.partial %} <span class="badge badge-warning">Partial</span>{% endif %}</td>
+          <td class="num">{{ m.outgoings | money_whole }}</td><td class="num">{{ m.income | money_whole }}</td>
+          <td class="num {{ 'pos' if m.net > 0 else ('neg' if m.net < 0) }}">{{ m.net | money_delta }}</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if typical %}
+      <tfoot><tr><td>Typical ({{ typ_label }})</td><td class="num">{{ typical.spending | money_whole }}</td><td class="num">{{ typical.income | money_whole }}</td><td class="num {{ 'pos' if typical.net > 0 else ('neg' if typical.net < 0) }}">{{ typical.net | money_delta }}</td></tr></tfoot>
+      {% endif %}
+    </table>
+    </div>
+    <p class="panel-note">Net is income minus spending. Mark a bonus or a refund one-off in Transactions to keep it out of the averages.</p>
+  </div>
+</section>
+
+<section class="bench even">
+  <div class="panel" id="panel-largest">
+    <div class="panel-head"><h2>Largest payments in {{ month | month_name }}</h2>
+      <div class="tools"><a href="{{ txn }}">All {{ summary.count if summary else 0 }} transactions</a></div></div>
+    {% if largest %}
+    <div class="table-scroll">
+    <table class="data">
+      <thead><tr><th scope="col">Payee</th><th scope="col">Category</th><th scope="col">Date</th><th scope="col" class="num">Amount</th></tr></thead>
+      <tbody>
+      {% for t in largest %}
+        <tr><td class="desc">{{ t.description }}</td>
+          <td>{% if t.category %}{{ t.category }}{% else %}<a href="{{ txn }}&uncategorised=1">Uncategorised</a>{% endif %}</td>
+          <td class="nowrap">{{ t.date | date_label }}</td><td class="num">{{ (-t.amount) | money_pence }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="panel-note">No payments in {{ month | month_label }} yet.</p>{% endif %}
+  </div>
+  <div class="panel" id="panel-close">
+    <div class="panel-head"><h2>Before you close {{ month | month_name }}</h2>
+      <div class="tools"><span class="muted">{{ checklist.done }} of {{ checklist.total }} done</span></div></div>
+    {% if checklist.closed %}
+    <p>{{ month | month_name }} is closed. <a href="/review?month={{ month }}">Reopen it from Review</a></p>
+    {% elif not todo %}
+    <p>Every step is done. <a href="/review?month={{ month }}">Close {{ month | month_name }} from Review</a></p>
+    {% else %}
+    <div class="table-scroll">
+    <table class="data close-steps">
+      <tbody>
+      {% for s in todo %}
+        <tr><td class="step-title">{{ icon('todo', small=True) }}{{ s.title }}</td><td>{{ s.detail }}</td><td class="num"><a href="{{ s.href }}">{{ s.action }}</a></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="panel-note">The same list sits at the foot of the sidebar on every page.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_data %}
+<script id="dash-data" type="application/json">{{ {
+  "month": month | month_label(true),
+  "where": against.rows | map(attribute="name") | list,
+  "where_values": against.rows | map(attribute="spend") | list,
+  "where_uncat": against.rows | map(attribute="uncategorised") | list,
+  "months": months6 | map(attribute="month") | map("month_label") | list,
+  "partial": months6 | map(attribute="partial") | list,
+  "spending": months6 | map(attribute="outgoings") | list,
+  "income": months6 | map(attribute="income") | list,
+  "avg3": months6 | map(attribute="avg3") | list
+} | tojson }}</script>
+<script src="{{ static_url('vendor/chart.umd.js') }}"></script>
+<script src="{{ static_url('dashboard.js') }}" defer></script>
+{% endif %}
+{% endblock %}

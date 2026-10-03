@@ -1,0 +1,8 @@
+{#- One transaction row, kept lean: a 577-row month must stay under 300KB. No cell classes (transactions.css styles
+    columns by position), hx-target/swap come from the table, the chooser is the page's one datalist, the selection
+    ids and the One-off post (after 400ms) are added by transactions.js, and the editor is only rendered for rows
+    that are open (uncategorised or in error). -#}
+{%- set label = (r.parent_name ~ ' / ' ~ r.category_name) if r.parent_name else (r.category_name or '') -%}
+{%- set editing = (not r.category_id) or error -%}
+{%- set cls = ('uncat' if not r.category_id else '') ~ (' one-off' if r.one_off else '') ~ (' is-editing' if editing else '') %}
+<tr id="txn-{{ r.id }}"{% if cls %} class="{{ cls | trim }}"{% endif %}><td><input type="checkbox" aria-label="Select"></td><td>{{ r.date | date_label }}</td><td>{{ r.account_name }}<small>{{ r.type_code or '' }}</small></td><td>{{ r.description }}{% if r.fx_currency %} <small>{{ r.fx_currency }} {{ '%.2f' % r.fx_amount }}</small>{% endif %}</td><td>{{ r.amount | money_pence }}</td><td>{% if editing %}{% include "_cat_editor.html" %}{% else %}<button class="cat" id="txn-{{ r.id }}-category" aria-describedby="cat-hint">{{ label }}</button>{% endif %}</td><td>{% if r.categorised_by == 'manual' %}<span class="badge">Manual</span>{% elif r.categorised_by == 'rule' %}<span class="badge">Rule</span>{% elif r.categorised_by == 'source' %}<span class="badge">From bank</span>{% endif %}</td><td><input type="checkbox" id="txn-{{ r.id }}-one-off" aria-label="One-off"{{ ' checked' if r.one_off }}></td></tr>

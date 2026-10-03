@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Net worth{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('networth.css') }}">{% endblock %}
+{% block content %}
+{% set m = nw.mortgage_main %}
+{% set edit_all = not nw.stale %}
+<div class="page-head">
+  <div>
+    <h1>Net worth</h1>
+    <p class="status-line">Today, from the latest balances and valuations.{% if nw.stale %} <b>{{ nw.stale | length }} account balance{{ 's are' if nw.stale | length > 1 else ' is' }}</b> more than {{ stale_days }} days old or never entered.{% endif %}</p>
+  </div>
+  <div class="tools">
+    <button type="button" class="btn btn-primary" id="update-balances" data-update-toggle aria-pressed="{{ 'true' if updating else 'false' }}" aria-controls="balances-form">{{ icon('refresh', small=True) }}Update balances</button>
+    <button class="btn" type="button" data-open-holding>{{ icon('plus', small=True) }}Add asset</button>
+  </div>
+</div>
+
+<section class="strip" aria-label="Headline figures">
+  <div class="strip-item"><span class="strip-label">Net worth</span>
+    <span class="figure {{ 'neg' if nw.total < 0 }}"{% if nw.total | abs >= 100000 %} title="{{ nw.total | money }}"{% endif %}>{{ nw.label.total }}</span>
+    <span class="strip-delta {{ ('pos' if nw.delta >= 0 else 'neg') if nw.delta is not none else 'muted' }}">{% if nw.delta is not none %}{{ icon('arrow-up' if nw.delta >= 0 else 'arrow-down', small=True) }}{{ fmt.signed(nw.delta) }} since {{ nw.history[-2].label }}{% elif nw.snapshot_dates %}First snapshot{% else %}No snapshot yet{% endif %}</span>
+    <span class="strip-note">Accounts {{ fmt.money(nw.cash_in_accounts) }} + assets {{ fmt.money(nw.assets) }} − liabilities {{ fmt.money(nw.liabilities) }}</span></div>
+  <div class="strip-item"><span class="strip-label">Liquid</span>
+    <span class="figure"{% if nw.liquid | abs >= 100000 %} title="{{ nw.liquid | money }}"{% endif %}>{{ nw.label.liquid }}</span>
+    <span class="strip-delta muted">{% if nw.total %}{{ (nw.liquid / nw.total) | pct }} of net worth{% else %}—{% endif %}</span>
+    <span class="strip-note">Cash, pots, ISAs and stocks</span></div>
+  <div class="strip-item"><span class="strip-label">Property equity</span>
+    <span class="figure"{% if nw.equity | abs >= 100000 %} title="{{ nw.equity | money }}"{% endif %}>{{ nw.label.equity }}</span>
+    <span class="strip-delta muted">{% if nw.ltv_pct is not none %}Loan to value {{ nw.ltv_pct }}%{% else %}No property yet{% endif %}</span>
+    <span class="strip-note">{% if nw.property_value %}{{ fmt.money(nw.property_value) }} home − {{ fmt.money(nw.mortgage) }} mortgage{% else %}Add your home and its mortgage with Add asset.{% endif %}</span></div>
+  <div class="strip-item"><span class="strip-label">Mortgage</span>
+    <span class="figure"{% if nw.mortgage | abs >= 100000 %} title="{{ nw.mortgage | money }}"{% endif %}>{{ nw.label.mortgage }}</span>
+    <span class="strip-delta {{ 'pos' if m and m.monthly_capital else 'muted' }}">{% if m and m.monthly_capital %}{{ icon('arrow-down', small=True) }}−{{ fmt.money(m.monthly_capital) }} a month{% elif m %}Payment not recorded{% else %}No mortgage yet{% endif %}</span>
+    <span class="strip-note">{% if m and m.monthly_payment %}Capital repaid at {{ m.rate if m.rate is not none else '—' }}%, {{ fmt.money(m.monthly_payment) }} a month{% elif m %}Add the rate and payment to see the capital repaid.{% else %}Enter it on the property.{% endif %}</span></div>
+</section>
+
+<section class="bench">
+  <div class="panel">
+    <div class="panel-head"><h2>What we own and owe</h2>
+      <div class="tools">{% if nw.parts or nw.debts %}<button type="button" class="btn-quiet" aria-pressed="false" aria-controls="twin-composition" data-table-toggle="composition">{{ icon('table', small=True) }}<span>Table</span></button>{% endif %}</div></div>
+    {% if nw.parts or nw.debts %}
+    <div class="chart-wrap composition-chart" id="chart-composition-wrap"><canvas id="chart-composition" role="img" aria-label="{{ nw.chart_label }}"></canvas></div>
+    <div class="legend" id="legend-composition" aria-hidden="true"></div>
+    <div id="twin-composition" class="table-scroll chart-twin" hidden><table class="data">
+      <thead><tr><th scope="col">Part</th><th scope="col" class="num">Value</th><th scope="col" class="num">Share of what we own</th></tr></thead>
+      <tbody>{% for p in nw.parts %}<tr><td>{{ p.name }}</td><td class="num">{{ fmt.money(p.value) }}</td><td class="num">{{ p.share | pct }}</td></tr>{% endfor %}
+      {% for d in nw.debts %}<tr><td>{{ d.name }}</td><td class="num neg">{{ fmt.signed(d.value) }}</td><td class="num"></td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td>Net worth</td><td class="num">{{ fmt.money(nw.total) }}</td><td></td></tr></tfoot>
+    </table></div>
+    {% else %}
+    <div class="empty"><span class="empty-icon">{{ icon('net-worth') }}</span><h3>Nothing to show yet</h3><p>Account balances arrive with statements; add your home, mortgage and savings with <b>Add asset</b> and the picture fills in.</p></div>
+    {% endif %}
+
+    <h3 class="sub-title">Loan to value{% if nw.ltv_pct is not none %} <span class="muted">{{ nw.ltv_pct }}% · {% if nw.next_band %}next band at {{ nw.next_band }}%{% else %}above the top band{% endif %}</span>{% endif %}</h3>
+    {% if nw.ltv_pct is not none %}
+    <div class="meter" role="meter" aria-valuenow="{{ nw.ltv_pct }}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="{{ nw.ltv_pct }}%" aria-label="Loan to value {{ nw.ltv_pct }}%, lender bands at 60, 75 and 85%">
+      <svg class="meter-svg" aria-hidden="true" preserveAspectRatio="none"><rect class="meter-fill" x="0" y="0" width="{{ [nw.ltv_pct, 100] | min }}%" height="100%"/></svg>
+      <i class="at-60" data-l="60%"></i><i class="at-75" data-l="75%"></i><i class="at-85" data-l="85%"></i>
+    </div>
+    {% else %}<p class="small muted">Appears once a property and its mortgage are entered.</p>{% endif %}
+
+    <div class="panel-head sub-head"><h3 class="sub-title">Net worth over time</h3>
+      {% if nw.history %}<div class="tools"><button type="button" class="btn-quiet" aria-pressed="false" aria-controls="twin-history" data-table-toggle="history">{{ icon('table', small=True) }}<span>Table</span></button></div>{% endif %}</div>
+    {% if nw.history %}
+    <div class="chart-wrap history-chart" id="chart-history-wrap"><canvas id="chart-history" role="img" aria-label="Net worth over time: {{ nw.history | length }} points from {{ nw.history[0].label }} to {{ nw.history[-1].label }}, now {{ fmt.money(nw.history[-1].value) }}; the table has the figures"></canvas></div>
+    <div id="twin-history" class="table-scroll chart-twin" hidden>
+      <table class="data history-table"><thead><tr><th scope="col">Date</th><th scope="col" class="num">Net worth</th></tr></thead>
+      <tbody>{% for p in nw.history %}<tr><td>{{ p.label }}</td><td class="num">{{ fmt.money(p.value) }}</td></tr>{% endfor %}</tbody></table>
+    </div>
+    {% else %}
+    <div class="empty history-empty"><span class="empty-icon">{{ icon('projection') }}</span><h4>No history yet</h4>
+      <p>{% if nw.snapshot_dates %}One snapshot so far, on {{ fmt.day_label(nw.snapshot_dates[0]) }}. The line appears after your second: each <b>Update balances</b> and each valuation is kept, so a history builds up month by month.{% else %}The line appears after two updates: each <b>Update balances</b> and each valuation is kept, so a history builds up month by month.{% endif %}</p></div>
+    {% endif %}
+
+    {% for mg in nw.mortgages %}
+    <details class="disclosure disclosure-sm mortgage">
+      <summary>Mortgage{% if mg.provider %} · {{ mg.provider }}{% endif %} · {{ fmt.money(mg.value) }}{% if mg.rate is not none %} at {{ mg.rate }}%{% endif %}</summary>
+      <dl class="facts">
+        <div><dt>Outstanding</dt><dd>{{ fmt.money(mg.value) }}</dd></div>
+        <div><dt>Rate</dt><dd>{{ mg.rate ~ '%' if mg.rate is not none else 'Not recorded' }}</dd></div>
+        <div><dt>Monthly payment</dt><dd>{{ fmt.money(mg.monthly_payment) if mg.monthly_payment else 'Not recorded' }}</dd></div>
+        <div><dt>Of which interest</dt><dd>about {{ fmt.money(mg.monthly_interest) }}</dd></div>
+        <div><dt>Capital repaid</dt><dd>{{ 'about ' ~ fmt.money(mg.monthly_capital) if mg.monthly_capital is not none else 'Not recorded' }}</dd></div>
+        <div><dt>Fix ends</dt><dd>{{ fmt.day_label(mg.fix_end) if mg.fix_end else 'Not recorded' }}</dd></div>
+        <div><dt>Term ends</dt><dd>{{ fmt.day_label(mg.term_end) if mg.term_end else 'Not recorded' }}</dd></div>
+        <div><dt>Valued</dt><dd>{{ mg.valued_label }}</dd></div>
+      </dl>
+      <p class="panel-note">{% if mg.parent_id %}Kept as a liability linked to the property.{% else %}Entered on its own; add it to the property to track equity.{% endif %} <button type="button" class="btn-quiet btn-inline" data-edit-holding="{{ mg.parent_id or mg.id }}" aria-label="Edit {{ mg.name }}">Edit</button></p>
+    </details>
+    {% endfor %}
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Accounts</h2><div class="tools"><span class="muted">Total {{ fmt.money(nw.cash_in_accounts) }}</span></div></div>
+    <form method="post" action="/networth/balances" id="balances-form" class="{{ 'is-updating' if updating }}">
+    <div class="table-scroll"><table class="data accounts-table">
+      <thead><tr><th scope="col">Account</th><th scope="col">Owner</th><th scope="col" class="num">Balance</th><th scope="col">Updated</th></tr></thead>
+      <tbody>
+      {% for a in nw.accounts %}
+      {% set ek = 'balance_' ~ a.id %}
+      {% set editable = a.stale or edit_all %}
+      {% set row_edit = updating and editable %}
+      <tr data-editable="{{ 1 if editable else 0 }}" class="{{ 'is-editing' if row_edit }}">
+        <td>{{ a.name }}</td><td>{{ a.owner_label }}</td>
+        <td class="num">
+          <span class="shown {{ 'neg' if a.balance is not none and a.balance < 0 }}" {% if row_edit %}hidden{% endif %}>{{ fmt.money(a.balance) if a.balance is not none else '—' }}</span>
+          <span class="editing" {% if not row_edit %}hidden{% endif %}><label class="visually-hidden" for="{{ ek }}">New balance for {{ a.name }}</label><input id="{{ ek }}" name="{{ ek }}" class="w-8ch" inputmode="decimal" placeholder="{{ '%.0f' % a.balance if a.balance is not none else '£' }}" value="{{ form[ek] or '' }}"{% if errors[ek] %} aria-invalid="true" aria-describedby="err-{{ ek }}"{% endif %}>{% if errors[ek] %}<span class="field-error" id="err-{{ ek }}">{{ errors[ek] }}</span>{% endif %}</span></td>
+        <td class="nowrap updated">
+          <span class="shown" {% if row_edit %}hidden{% endif %}>{{ a.updated }}<br>{% if a.stale %}<span class="badge badge-warning">{{ (a.age ~ ' days old') if a.age is not none else 'Never updated' }}</span>{% else %}<span class="badge">{{ 'Statement' if a.source == 'statement' else 'Manual' }}</span>{% endif %}</span>
+          <span class="editing" {% if not row_edit %}hidden{% endif %}><label class="visually-hidden" for="date_{{ a.id }}">Date of the balance for {{ a.name }}</label><input type="date" id="date_{{ a.id }}" name="date_{{ a.id }}" value="{{ today }}"></span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4"><div class="empty"><span class="empty-icon">{{ icon('accounts') }}</span><h3>No accounts yet</h3><p>Accounts appear once a statement is imported.</p><a class="btn" href="/statements">{{ icon('upload', small=True) }}Go to Statements</a></div></td></tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="2">Total in accounts</td><td class="num">{{ fmt.money(nw.cash_in_accounts) }}</td><td></td></tr></tfoot>
+    </table></div>
+    <div class="actions balances-actions" {% if not updating %}hidden{% endif %}>
+      <button type="submit" class="btn btn-primary">Save balances</button>
+      <button type="button" class="btn" data-update-cancel>Cancel</button>
+      <span class="small muted">{% if edit_all %}Every row is open.{% else %}Only balances older than {{ stale_days }} days are open; leave a row blank to skip it.{% endif %}</span>
+    </div>
+    </form>
+    <p class="panel-note">Balances come from the latest statement. Monzo accounts and pots don't carry one, so enter today's balance from the app with <b>Update balances</b>.</p>
+
+    <div class="panel-head section-head"><h2>Assets and liabilities</h2><div class="tools"><span class="muted">Net {{ fmt.money(nw.assets - nw.liabilities) }}</span></div></div>
+    <div class="table-scroll"><table class="data holdings-table">
+      <thead><tr><th scope="col">Name</th><th scope="col">Owner</th><th scope="col" class="num">Value</th><th scope="col">Valued</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+      <tbody>
+      {% for h in nw.holdings %}
+      <tr class="{{ 'sub' if h.parent_id }}">
+        <td>{{ h.kind_label if h.parent_id and h.kind == 'mortgage' else h.name }}{% if h.kind == 'property' and not h.mortgage %} <span class="badge badge-warning">No mortgage yet</span>{% endif %}
+          <span class="kind-line">{% if not (h.parent_id and h.kind == 'mortgage') %}{{ h.kind_label }}{% if h.provider %} · {% endif %}{% endif %}{{ h.provider or '' }}</span></td>
+        <td>{{ h.owner_label }}</td>
+        <td class="num {{ 'neg' if h.is_liability }}">{{ fmt.signed(h.signed) if h.is_liability else fmt.money(h.value) }}</td>
+        <td class="nowrap">{{ h.valued_label }}</td>
+        <td class="row-actions"><button type="button" class="btn-quiet row-edit" data-edit-holding="{{ h.parent_id or h.id }}" aria-label="{{ 'Edit ' ~ h.name ~ ' on its property' if h.parent_id else 'Edit ' ~ h.name }}">{{ icon('edit', small=True) }}Edit</button></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5"><div class="empty"><span class="empty-icon">{{ icon('net-worth') }}</span><h3>No assets or liabilities yet</h3><p>Start with your home and mortgage, then add ISAs, pensions and loans.</p><button type="button" class="btn" data-open-holding>Add asset</button></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <p class="panel-note">Edit opens the asset with its fields filled in; Delete is inside it and names what goes.</p>
+  </div>
+</section>
+
+{% set loan = mortgage if (editing and editing.kind == 'property') else editing %}
+{% set kind_now = form.kind if 'kind' in form else (editing.kind if editing else 'property') %}
+<dialog class="holding-dialog" id="holding-dialog" aria-labelledby="holding-title"{% if dialog_open %} open{% endif %}>
+  <form method="post" action="/holdings" id="holding-form">
+    <div class="dialog-head"><h2 id="holding-title">{{ 'Edit ' ~ editing.name if editing else ('Edit ' ~ form.name if form.holding_id else 'Add an asset or liability') }}</h2>
+      <button type="button" class="btn-quiet dialog-close" data-dialog-close aria-label="Close">{{ icon('close', small=True) }}</button></div>
+    <input type="hidden" name="holding_id" id="h-id" value="{{ editing.id if editing else (form.holding_id or '') }}">
+    <div class="form-grid">
+      <label class="field">Name <input name="name" id="h-name" required value="{{ form.name if 'name' in form else (editing.name if editing else '') }}" placeholder="Our house, Vanguard ISA"></label>
+      <label class="field">Type
+        <select name="kind" id="h-kind">
+          {% for k, label in kinds.items() %}<option value="{{ k }}" {{ 'selected' if kind_now == k }}>{{ label }}</option>{% endfor %}
+        </select></label>
+      <label class="field">Owner
+        <select name="owner" id="h-owner">{% for o, label in owners.items() %}<option value="{{ o }}" {{ 'selected' if (form.owner if 'owner' in form else (editing.owner if editing else 'joint')) == o }}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field">Provider <input name="provider" id="h-provider" value="{{ form.provider if 'provider' in form else ((editing.provider or '') if editing else '') }}" placeholder="Optional"></label>
+      <label class="field">Value £ <input name="value" id="h-value" inputmode="decimal" required value="{{ form.value if 'value' in form else ('%.2f' % editing.value if editing else '') }}"{% if errors.value %} aria-invalid="true" aria-describedby="err-value"{% endif %}>
+        {% if errors.value %}<span class="field-error" id="err-value">{{ errors.value }}</span>{% endif %}</label>
+      <label class="field">Valued on <input type="date" name="valued_at" id="h-valued" required value="{{ form.valued_at if 'valued_at' in form else (editing.valued_at if editing else today) }}">
+        <span class="field-help">Each save is kept, so a history builds up.</span></label>
+    </div>
+    <fieldset id="h-mortgage-fields" class="form-grid dialog-group" {% if kind_now != 'property' %}hidden{% endif %}>
+      <legend>Mortgage</legend>
+      <label class="field">Outstanding £ <input name="mortgage_balance" id="h-mortgage" inputmode="decimal" value="{{ form.mortgage_balance if 'mortgage_balance' in form else ('%.2f' % mortgage.value if mortgage and mortgage.value else '') }}" placeholder="Blank if none"{% if errors.mortgage_balance %} aria-invalid="true" aria-describedby="err-mortgage_balance"{% endif %}>
+        {% if errors.mortgage_balance %}<span class="field-error" id="err-mortgage_balance">{{ errors.mortgage_balance }}</span>{% endif %}</label>
+      <label class="field">Lender <input name="mortgage_provider" id="h-lender" value="{{ form.mortgage_provider if 'mortgage_provider' in form else ((mortgage.provider or '') if mortgage else '') }}" placeholder="Optional"></label>
+      <span class="field-help dialog-group-help">Kept as a liability linked to this property.</span>
+    </fieldset>
+    <fieldset id="h-loan-fields" class="form-grid dialog-group" {% if kind_now not in ('property', 'loan', 'cash', 'cash_isa') %}hidden{% endif %}>
+      <legend id="h-loan-legend">{{ {'property': 'Mortgage terms', 'loan': 'Loan terms'}.get(kind_now, 'Interest') }}</legend>
+      <label class="field">Rate % <input name="rate" id="h-rate" class="w-6ch" inputmode="decimal" value="{{ form.rate if 'rate' in form else (loan.rate if loan and loan.rate is not none else '') }}"{% if errors.rate %} aria-invalid="true" aria-describedby="err-rate"{% endif %}>
+        {% if errors.rate %}<span class="field-error" id="err-rate">{{ errors.rate }}</span>{% endif %}</label>
+      <label class="field">Monthly payment £ <input name="monthly_payment" id="h-payment" class="w-8ch" inputmode="decimal" value="{{ form.monthly_payment if 'monthly_payment' in form else ('%.2f' % loan.monthly_payment if loan and loan.monthly_payment else '') }}"{% if errors.monthly_payment %} aria-invalid="true" aria-describedby="err-monthly_payment"{% endif %}>
+        {% if errors.monthly_payment %}<span class="field-error" id="err-monthly_payment">{{ errors.monthly_payment }}</span>{% endif %}</label>
+      <label class="field">Fix ends <input type="date" name="fix_end" id="h-fix" value="{{ form.fix_end if 'fix_end' in form else ((loan.fix_end or '') if loan else '') }}"></label>
+      <label class="field">Term ends <input type="date" name="term_end" id="h-term" value="{{ form.term_end if 'term_end' in form else ((loan.term_end or '') if loan else '') }}"></label>
+    </fieldset>
+    <label class="field dialog-notes">Notes <input name="notes" id="h-notes" value="{{ form.notes if 'notes' in form else ((editing.notes or '') if editing else '') }}"></label>
+  </form>
+  <div class="dialog-foot">
+    <form method="post" action="/holdings/{{ editing.id if editing else 0 }}/delete" id="holding-delete" data-confirm="Delete {{ editing.name if editing else '' }}?" data-confirm-detail="{% if editing %}{{ editing.n_snapshots }} valuation{{ 's' if editing.n_snapshots != 1 }} recorded{% if editing.mortgage %}; its mortgage goes with it{% endif %}. This can't be undone.{% endif %}" {% if not editing %}hidden{% endif %}>
+      <button type="submit" class="btn btn-danger">{{ icon('trash', small=True) }}Delete</button>
+    </form>
+    <div class="actions">
+      <button type="button" class="btn" data-dialog-close>Cancel</button>
+      <button type="submit" form="holding-form" class="btn btn-primary" id="holding-submit">{{ 'Save changes' if (editing or form.holding_id) else 'Add asset' }}</button>
+    </div>
+  </div>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script id="networth-data" type="application/json">{{ {
+  "parts": nw.parts, "debts": nw.debts, "history": nw.history,
+  "holdings": nw.holdings
+} | tojson }}</script>
+<script src="{{ static_url('vendor/chart.umd.js') }}"></script>
+<script src="{{ static_url('networth.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,156 @@
+[
+  {
+    "name": "Housing",
+    "kind": "expense",
+    "children": [
+      "Mortgage",
+      "Mortgage overpayment",
+      "Council tax",
+      "Home insurance",
+      "Maintenance & DIY"
+    ]
+  },
+  {
+    "name": "Utilities",
+    "kind": "expense",
+    "children": [
+      "Energy",
+      "Water",
+      "Broadband & phone",
+      "TV & streaming"
+    ]
+  },
+  {
+    "name": "Groceries",
+    "kind": "expense",
+    "children": [
+      "Supermarket",
+      "Local shop",
+      "Wholesale"
+    ]
+  },
+  {
+    "name": "Eating out",
+    "kind": "expense",
+    "children": [
+      "Restaurants & cafes",
+      "Takeaway & delivery",
+      "Pubs & bars"
+    ]
+  },
+  {
+    "name": "Transport",
+    "kind": "expense",
+    "children": [
+      "Fuel",
+      "Car maintenance",
+      "Parking & tolls",
+      "Public transport",
+      "Car insurance & tax",
+      "Taxi & ride hailing"
+    ]
+  },
+  {
+    "name": "Pets",
+    "kind": "expense",
+    "children": [
+      "Pet insurance",
+      "Vet",
+      "Pet food & supplies",
+      "Pet care & sitting"
+    ]
+  },
+  {
+    "name": "Children",
+    "kind": "expense",
+    "children": [
+      "Classes & activities",
+      "Childcare",
+      "Clothes & kit",
+      "Toys & books"
+    ]
+  },
+  {
+    "name": "Shopping",
+    "kind": "expense",
+    "children": [
+      "Household",
+      "Clothing",
+      "Online",
+      "Gifts",
+      "Electronics"
+    ]
+  },
+  {
+    "name": "Leisure",
+    "kind": "expense",
+    "children": [
+      "Days out",
+      "Holidays",
+      "Subscriptions",
+      "Hobbies",
+      "Lottery & competitions"
+    ]
+  },
+  {
+    "name": "Health & personal care",
+    "kind": "expense",
+    "children": [
+      "Pharmacy",
+      "Medical & dental",
+      "Hair & beauty",
+      "Fitness"
+    ]
+  },
+  {
+    "name": "Cash",
+    "kind": "expense",
+    "children": [
+      "Cash withdrawal"
+    ]
+  },
+  {
+    "name": "Bank charges",
+    "kind": "expense",
+    "children": [
+      "Interest",
+      "Fees",
+      "FX fees"
+    ]
+  },
+  {
+    "name": "Work & side business",
+    "kind": "expense",
+    "children": [
+      "Software & hosting",
+      "Advertising",
+      "Equipment"
+    ]
+  },
+  {
+    "name": "Other spending",
+    "kind": "expense",
+    "children": []
+  },
+  {
+    "name": "Income",
+    "kind": "income",
+    "children": [
+      "Salary",
+      "Side business",
+      "Refunds",
+      "Interest received",
+      "Other income"
+    ]
+  },
+  {
+    "name": "Transfers",
+    "kind": "transfer",
+    "children": [
+      "Between own accounts",
+      "Credit card payment",
+      "Savings",
+      "Investments"
+    ]
+  }
+]

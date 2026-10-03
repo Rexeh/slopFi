@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('projection.css') }}"><link rel="stylesheet" href="{{ static_url('setup.css') }}">{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p class="status-line">Who the household is, and the annual figures the <a href="/projection">Projection</a> uses wherever a scenario or an asset doesn't say otherwise. Interest observed on a pot overrides the pot default.</p>
+  </div>
+</div>
+<section class="panel" aria-labelledby="household-h" id="household">
+  <div class="panel-head"><h2 id="household-h">Household</h2></div>
+  <form method="post" action="/settings/household" class="household-form">
+    <label class="field" for="household-name">Name
+      <input name="name" id="household-name" class="w-24ch" required autocomplete="off" value="{{ household_form.name if 'name' in household_form else household.name }}" aria-describedby="help-household-name{% if errors.household_name %} err-household_name{% endif %}"{% if errors.household_name %} aria-invalid="true"{% endif %}>
+      {% if errors.household_name %}<span class="field-error" id="err-household_name">{{ errors.household_name }}</span>{% endif %}
+      <span class="field-help" id="help-household-name">The sidebar shows "{{ household.subtitle }}".</span>
+    </label>
+    <button type="submit" class="btn">Save name</button>
+  </form>
+  <h3 class="household-people-h">People</h3>
+  <div class="table-scroll">
+  <table class="data people">
+    <thead><tr><th scope="col">Name</th><th scope="col">Owns</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for p in household.people %}
+      <tr id="person-{{ p.key }}">
+        <td>{{ p.name }}</td><td>{{ p.owns or 'Nothing yet' }}</td>
+        <td class="actions">
+          <button type="button" class="btn-quiet row-edit" data-edit="person-edit-{{ p.key }}" aria-label="Rename {{ p.name }}">{{ icon('edit', small=True) }}Rename</button>
+          {% if p.owns %}
+          <button type="button" class="btn-quiet danger row-edit" disabled aria-describedby="person-why-{{ p.key }}">{{ icon('trash', small=True) }}Remove</button>
+          <span class="row-edit in-use" id="person-why-{{ p.key }}">Owns {{ p.owns }}</span>
+          {% else %}
+          <form method="post" action="/settings/household/people/{{ p.key }}/delete" class="inline" data-confirm="Remove {{ p.name }}?" data-confirm-label="Remove" data-confirm-detail="{{ p.name }} owns no accounts or assets, so nothing else changes.">
+            <button class="btn-quiet danger row-edit" aria-label="Remove {{ p.name }}">{{ icon('trash', small=True) }}Remove</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      <tr id="person-edit-{{ p.key }}" class="is-editing edit-row" hidden>
+        <td><label class="field"><span class="visually-hidden">New name for {{ p.name }}</span><input name="name" form="person-form-{{ p.key }}" value="{{ p.name }}" required class="w-24ch"></label></td>
+        <td>{{ p.owns or 'Nothing yet' }}</td>
+        <td class="actions">
+          <button type="submit" form="person-form-{{ p.key }}" class="btn btn-sm">Save</button>
+          <button type="button" class="btn-quiet" data-cancel="person-{{ p.key }}">Cancel</button>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3"><div class="empty"><span class="empty-icon">{{ icon('accounts') }}</span><h3>No people yet</h3><p>Add the people who hold accounts, so each one can be an owner.</p></div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% for p in household.people %}<form id="person-form-{{ p.key }}" method="post" action="/settings/household/people/{{ p.key }}/rename"></form>{% endfor %}
+  <form method="post" action="/settings/household/people" class="household-form">
+    <label class="field" for="person-name">Add a person
+      <input name="name" id="person-name" class="w-24ch" required autocomplete="off" placeholder="Name" value="{{ household_form.person_name or '' }}"{% if errors.person_name %} aria-invalid="true" aria-describedby="err-person_name"{% endif %}>
+      {% if errors.person_name %}<span class="field-error" id="err-person_name">{{ errors.person_name }}</span>{% endif %}
+    </label>
+    <button type="submit" class="btn">{{ icon('plus') }}Add person</button>
+  </form>
+  <p class="panel-note">Owner choices for accounts and assets are Joint, each person here, and Unknown. Someone who owns an account or an asset can't be removed until it is given another owner on Accounts and statements or Net worth.</p>
+</section>
+<section class="panel" aria-labelledby="defaults-h">
+  <div class="panel-head"><h2 id="defaults-h">Projection defaults</h2></div>
+  <form method="post" action="/settings" id="settings-form">
+    <div class="form-grid settings-grid">
+      {% for s in settings %}{% set k = s.key | replace('.', '-') %}
+      <label class="field" for="set-{{ k }}">{{ s.label }}
+        <input name="{{ s.key }}" id="set-{{ k }}" class="num" inputmode="decimal" value="{{ s.value }}" placeholder="{{ s.default }}" aria-describedby="help-{{ k }}{% if errors[s.key] %} err-{{ s.key }}{% endif %}"{% if errors[s.key] %} aria-invalid="true"{% endif %}>
+        {% if errors[s.key] %}<span class="field-error" id="err-{{ s.key }}">{{ errors[s.key] }}</span>{% endif %}
+        <span class="field-help" id="help-{{ k }}">Built-in default {{ s.default }}{{ '' if s.unit == 'years' else '%' }}.{% if s.help %} {{ s.help }}{% endif %} Leave blank to use the default.</span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="actions form-actions"><button type="submit" class="btn btn-primary">Save settings</button></div>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('setup.js') }}" defer></script>{% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Accounts and statements{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('setup.css') }}">{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Accounts and statements</h1>
+    <p class="status-line">
+      {% if statements %}<b>{{ statements | length }} statement{{ '' if statements | length == 1 else 's' }}</b> across
+      <b>{{ accounts | length }} account{{ '' if accounts | length == 1 else 's' }}</b>; the latest ends {{ latest }}.
+      {% else %}No statements yet. Import one below, or from the configured folders.{% endif %}
+    </p>
+  </div>
+  <form method="post" action="/statements/sync" class="tools sync-form" id="sync-form" data-confirm-label="Remove and import"
+        {% if prunable.statements %}data-prune-title="Remove {{ prunable.statements }} statement{{ '' if prunable.statements == 1 else 's' }} whose files are gone?"
+        data-prune-detail="{{ prunable.names | join(', ') }}: {{ prunable.transactions }} transaction{{ '' if prunable.transactions == 1 else 's' }} go with them, along with any categories you set by hand. This can't be undone."{% endif %}>
+    <label class="check small"><input type="checkbox" name="prune" value="1" id="prune"> Remove statements whose files are gone{% if prunable.statements %} ({{ prunable.statements }}){% endif %}</label>
+    <button type="submit" class="btn">{{ icon('refresh') }}Import from configured folders</button>
+  </form>
+</div>
+
+<div class="tabs" role="tablist" aria-label="Accounts and statements">
+  <button type="button" role="tab" id="tab-statements" aria-controls="panel-statements" aria-selected="true">Statements</button>
+  <button type="button" role="tab" id="tab-accounts" aria-controls="panel-accounts" aria-selected="false" tabindex="-1">Accounts</button>
+</div>
+
+<div role="tabpanel" id="panel-statements" aria-labelledby="tab-statements">
+<section class="panel">
+  <div class="panel-head"><h2>Import a statement</h2></div>
+  <form method="post" action="/statements/upload" enctype="multipart/form-data" class="filters" id="upload-form">
+    <label class="field">Files <input type="file" name="files" accept=".pdf,.csv" multiple required></label>
+    <label class="field">Account
+      <select name="account_id" data-reveal="#new-acct" data-reveal-value="new">
+        <option value="">Detect from the file</option>
+        {% for a in accounts %}<option value="{{ a.id }}">{{ a.name }} · {{ a.owner_label }}</option>{% endfor %}
+        <option value="new">New account…</option>
+      </select>
+    </label>
+    <span id="new-acct" hidden class="filters">
+      <label class="field">Name <input name="new_account_name" placeholder="Monzo personal" class="w-24ch"></label>
+      <label class="field">Owner <select name="new_account_owner">{% for v, l in owners.items() %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+      <label class="field">Type <select name="new_account_kind">{% for v, l in kinds.items() %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+    </span>
+    <button type="submit" class="btn btn-primary">{{ icon('upload') }}Import</button>
+  </form>
+  <ul class="formats">
+    <li><b>HSBC, Amex and Monzo PDFs</b> are detected automatically; Monzo pots become savings accounts.</li>
+    <li><b>Monzo CSV</b> exports don't say which account they are from, so choose the account.</li>
+    <li>Use one format per account.</li>
+    <li>Re-importing a file, or overlapping exports, never duplicates a transaction.</li>
+  </ul>
+  {% if results %}
+  <ul class="results-list" aria-label="Import results">
+    {% for r in results %}
+    <li class="result result-{{ r.status }}">
+      {{ icon({'imported': 'check', 'duplicate': 'info', 'error': 'alert', 'pruned': 'trash'}.get(r.status, 'info'), small=True) }}
+      <span><b>{{ r.source }}</b> · {{ statuses.get(r.status, r.status | capitalize) }}
+        {% if r.status == 'imported' %}: {{ r.inserted }} new, {{ r.skipped }} already present, {{ r.categorised }} filed by rules{% endif %}
+        {% if r.message %}: {{ r.message }}{% endif %}
+        {% if r.warnings %}<ul class="result-warnings">{% for w in r.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>Imported statements</h2></div>
+  <div class="table-scroll">
+  <table class="data statements">
+    <thead><tr><th scope="col">Account</th><th scope="col">Period</th><th scope="col" class="num">Paid in</th><th scope="col" class="num">Paid out</th><th scope="col" class="num">Count</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for s in statements %}
+    <tr id="stmt-{{ s.id }}">
+      <td><b>{{ s.account_name }}</b><span class="type file">{{ s.source_name }}</span></td>
+      <td class="nowrap">{{ s.period }}</td>
+      <td class="num">{{ s.payments_in | money }}</td><td class="num">{{ s.payments_out | money }}</td><td class="num">{{ s.transaction_count }}</td>
+      <td class="actions">
+        <form method="post" action="/statements/{{ s.id }}/delete" class="inline" data-confirm="Delete {{ s.source_name }}?"
+              data-confirm-detail="{% if s.transaction_count %}This statement has {{ s.transaction_count }} transaction{{ '' if s.transaction_count == 1 else 's' }}, including any you categorised by hand.{% else %}This statement has no transactions.{% endif %} This can't be undone.">
+          <button class="btn-quiet danger row-edit" aria-label="Delete {{ s.source_name }}">{{ icon('trash', small=True) }}Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6"><div class="empty"><span class="empty-icon">{{ icon('upload') }}</span><h3>No statements yet</h3><p>Choose a file above to import your first.</p></div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+</div>
+
+<div role="tabpanel" id="panel-accounts" aria-labelledby="tab-accounts" hidden>
+<section class="panel">
+  <div class="panel-head"><h2>Accounts</h2></div>
+  <div class="table-scroll">
+  <table class="data accounts">
+    <thead><tr><th scope="col">Name</th><th scope="col">Owner</th><th scope="col">Type</th><th scope="col" class="num">Transactions</th><th scope="col">Range</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for a in accounts %}
+    <tr id="acct-{{ a.id }}">
+      <td><b>{{ a.name }}</b>{% if a.institution or a.identifier %}<span class="type">{{ a.institution or '' }}{% if a.institution and a.identifier %} · {% endif %}{{ a.identifier or '' }}</span>{% endif %}</td>
+      <td>{{ a.owner_label }}</td><td>{{ a.kind_label }}</td>
+      <td class="num">{% if a.n_txn %}<a href="/transactions?month=all&account_id={{ a.id }}">{{ a.n_txn }}</a>{% else %}0{% endif %}</td>
+      <td class="nowrap">{{ a.range or '—' }}</td>
+      <td class="actions">
+        <button type="button" class="btn-quiet row-edit" data-edit="acct-edit-{{ a.id }}" aria-label="Edit {{ a.name }}">{{ icon('edit', small=True) }}Edit</button>
+        {% if a.n_statements == 0 and a.n_txn == 0 %}
+        <form method="post" action="/accounts/{{ a.id }}/delete" class="inline" data-confirm="Delete {{ a.name }}?" data-confirm-detail="It has no statements and no transactions. This can't be undone.">
+          <button class="btn-quiet danger row-edit" aria-label="Delete {{ a.name }}">{{ icon('trash', small=True) }}Delete</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    <tr id="acct-edit-{{ a.id }}" class="is-editing edit-row" hidden>
+      <td><label class="field"><span class="visually-hidden">Name</span><input name="name" form="acct-form-{{ a.id }}" value="{{ a.name }}" required class="w-24ch"></label></td>
+      <td><label class="field"><span class="visually-hidden">Owner</span><select name="owner" form="acct-form-{{ a.id }}">{% for v, l in owners.items() %}<option value="{{ v }}" {{ 'selected' if v == a.owner }}>{{ l }}</option>{% endfor %}</select></label></td>
+      <td><label class="field"><span class="visually-hidden">Type</span><select name="kind" form="acct-form-{{ a.id }}">{% for v, l in kinds.items() %}<option value="{{ v }}" {{ 'selected' if v == a.kind }}>{{ l }}</option>{% endfor %}</select></label></td>
+      <td class="num">{{ a.n_txn }}</td><td class="nowrap">{{ a.range or '—' }}</td>
+      <td class="actions">
+        <button type="submit" form="acct-form-{{ a.id }}" class="btn btn-sm">Save</button>
+        <button type="button" class="btn-quiet" data-cancel="acct-{{ a.id }}">Cancel</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6"><div class="empty"><span class="empty-icon">{{ icon('accounts') }}</span><h3>No accounts yet</h3><p>Accounts are created when a statement is imported.</p></div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% for a in accounts %}<form id="acct-form-{{ a.id }}" method="post" action="/accounts/{{ a.id }}"></form>{% endfor %}
+  <p class="panel-note">Edit a name, owner or type and choose Save. An account can be deleted only once it has no statements.</p>
+</section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('setup.js') }}" defer></script>{% endblock %}

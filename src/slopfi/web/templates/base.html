@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Home{% endblock %} · slopFi</title>
+<link rel="icon" type="image/png" href="{{ static_url('logo-mark.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="{{ static_url('style.css') }}">
+<script>try { if (localStorage.getItem("sidebar") === "rail") document.documentElement.dataset.sidebar = "rail"; } catch (e) {}</script>
+<script src="{{ static_url('vendor/htmx.min.js') }}" defer></script>
+<script src="{{ static_url('app.js') }}" defer></script>
+{% block head %}{% endblock %}
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+{% include "_icons.html" %}
+{% set current = {"/recurring": "/spending", "/rules": "/categories"}.get(path, path) %}
+{% set groups = [
+  ("Review", [("/review", "review", "Review", shell.review_left, "steps left"),
+              ("/transactions", "transactions", "Transactions", shell.uncategorised, "uncategorised")]),
+  ("Understand", [("/", "overview", "Overview", 0, ""), ("/spending", "spending", "Spending", 0, ""),
+                  ("/networth", "net-worth", "Net worth", 0, ""), ("/projection", "projection", "Projection", 0, "")]),
+] %}
+{% set setup = [("/statements", "accounts", "Accounts and statements"), ("/categories", "categories", "Categories and rules"),
+                ("/settings", "settings", "Settings")] %}
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <a href="/" class="brand-link"><img class="brand-wordmark" src="{{ static_url('logo-wordmark.png') }}" width="140" height="85" alt="slopFi"><img class="brand-mark" src="{{ static_url('logo-mark.png') }}" width="28" height="28" alt="slopFi"><span class="brand-text"><small>{{ shell.household_subtitle }}</small></span></a>
+    <button class="rail-toggle" type="button" data-toggle-sidebar aria-expanded="true" aria-controls="sidebar">{{ icon('chevrons-left', title='Collapse sidebar') }}</button>
+  </div>
+  <nav aria-label="Main">
+    {% for heading, items in groups %}
+    <div class="nav-group">
+      <h2>{{ heading }}</h2>
+      {% for href, ic, label, badge, badge_what in items %}
+      <a href="{{ href }}" data-label="{{ label }}" {% if current == href %}aria-current="page"{% endif %}>
+        {{ icon(ic) }}<span class="nav-label">{{ label }}</span>
+        {% if badge %}<span class="count" aria-label="{{ badge }} {{ badge_what }}">{{ badge }}</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <details class="nav-group nav-setup menu" id="nav-setup" open>
+      <summary data-label="Setup">{{ icon('settings') }}<span class="nav-label">Setup</span>{{ icon('chevron-down', small=True) }}</summary>
+      <div class="menu-list">
+        <h2>Setup</h2>
+        {% for href, ic, label in setup %}
+        <a href="{{ href }}" data-label="{{ label }}" {% if current == href %}aria-current="page"{% endif %}>{{ icon(ic) }}<span class="nav-label">{{ label }}</span></a>
+        {% endfor %}
+      </div>
+    </details>
+  </nav>
+  {% if path != "/review" %}{% with checklist = shell.checklist, suffix = "" %}{% include "_checklist.html" %}{% endwith %}{% endif %}
+</aside>
+<main id="main" tabindex="-1">
+{% if path == "/" %}<div class="checklist-mobile">{% with checklist = shell.checklist, suffix = "-m" %}{% include "_checklist.html" %}{% endwith %}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog class="confirm" id="confirm" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-detail"></p>
+    <div class="actions">
+      <button type="submit" class="btn" value="cancel" autofocus>Cancel</button>
+      <button type="submit" class="btn btn-danger" value="confirm">Delete</button>
+    </div>
+  </form>
+</dialog>
+{% block scripts %}{% endblock %}
+</body>
+</html>

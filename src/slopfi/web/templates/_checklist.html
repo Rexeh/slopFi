@@ -1,0 +1,32 @@
+{# The month-close widget. `checklist` from review.checklist(); `suffix` keeps ids unique when rendered twice. #}
+{% set c = checklist %}
+<section class="checklist" id="checklist{{ suffix }}" aria-labelledby="close-h{{ suffix }}"
+         hx-get="/review/checklist" hx-trigger="refresh from:body" hx-swap="outerHTML">
+{% if not c.month %}
+  <h2 id="close-h{{ suffix }}">Month close</h2>
+  <p class="small muted">Nothing imported yet. <a href="/statements">Go to Statements</a></p>
+{% elif c.closed %}
+  <h2 id="close-h{{ suffix }}" class="checklist-closed">{{ icon('check', small=True) }}{{ c.month | month_name }} closed</h2>
+  <form method="post" action="/review/reopen" class="inline">
+    <input type="hidden" name="month" value="{{ c.month }}">
+    <button type="submit" class="btn-quiet">Reopen</button>
+  </form>
+{% else %}
+  <h2 id="close-h{{ suffix }}">Close {{ c.month | month_name }} <span>{{ c.done }} of {{ c.total }}</span></h2>
+  <div class="progress" role="progressbar" aria-valuenow="{{ c.done }}" aria-valuemin="0" aria-valuemax="{{ c.total }}" aria-label="Month-close progress"><b data-done="{{ c.done }}"></b></div>
+  <ol>
+  {% for s in c.steps %}
+    <li class="{{ 'is-done' if s.done else 'is-todo' }}">
+      {{ icon('check' if s.done else 'todo', small=True) }}
+      <a href="{{ s.href }}">{{ s.title }}</a>
+      <span class="n">{{ s.count }}</span>
+    </li>
+  {% endfor %}
+  </ol>
+  <form method="post" action="/review/close">
+    <input type="hidden" name="month" value="{{ c.month }}">
+    <button type="submit" class="btn" {{ 'disabled' if not c.can_close }} aria-describedby="close-why{{ suffix }}">{{ icon('check', small=True) }}Close {{ c.month | month_name }}</button>
+  </form>
+  <p id="close-why{{ suffix }}" class="small muted checklist-why">Enabled once every step is done.</p>
+{% endif %}
+</section>

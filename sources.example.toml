@@ -1,0 +1,47 @@
+# sources.toml: where your statement files live and which account each folder belongs to.
+# Copy this file to sources.toml (which is git-ignored) and edit the paths. `uv run slopfi sync` imports
+# every PDF and CSV below each folder; files already imported are skipped, so re-running is harmless.
+# Paths are relative to this file. Accounts are created on the first sync if they are missing.
+# `uv run slopfi demo` writes a working example of this layout to demo/sources.toml.
+
+# rules_file (optional, top level, before any [[source]]): a JSON rules file applied after every sync.
+# Rules already in the database are kept and duplicates are skipped, so the file can grow over time.
+# rules.local.json is the conventional place for your personal rules (it is git-ignored): create it with
+#   uv run slopfi rules export rules.local.json
+# and edit or re-import it with `uv run slopfi rules import rules.local.json [--replace]`. Then uncomment:
+# rules_file = "rules.local.json"
+
+# Each [[source]] is one folder of statements for one account.
+#   path    folder to scan, recursively (relative to this file)
+#   account the name the app shows; also how a CSV export, which does not identify its account, is matched
+#   owner   "joint", "unknown", or a person's key from Settings > Household (e.g. "alex"); a key that is not
+#           listed there yet is added to the household automatically, title-cased
+#   kind    "current", "credit_card" or "savings"; defaults to what the statement says
+
+[[source]]
+path = "data/joint/hsbc"
+account = "HSBC Joint"
+owner = "joint"
+kind = "current"
+
+# A Monzo PDF statement also carries every pot; each pot becomes its own savings account
+# named "Monzo pot: <name>" with the same owner.
+[[source]]
+path = "data/alex/monzo"
+account = "Monzo Alex"
+owner = "alex"
+kind = "current"
+
+# A Monzo CSV export has no balances and does not say which account it is from: this entry says so.
+# Use one format per account (PDF or CSV), not both, or transactions will be duplicated.
+[[source]]
+path = "data/sam/monzo"
+account = "Monzo Sam"
+owner = "sam"
+kind = "current"
+
+[[source]]
+path = "data/alex/amex"
+account = "Amex Alex"
+owner = "alex"
+kind = "credit_card"

@@ -1,0 +1,30 @@
+# personal financial data – never commit
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+
+# python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+*.egg-info/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+
+# personal configuration – never commit
+sources.toml
+rules.local.json
+
+# generated demo household (`slopfi demo`)
+/demo/
+
+# personal strings the test suite must never find in a published file (tests/test_no_personal_data.py)
+pii.local.txt

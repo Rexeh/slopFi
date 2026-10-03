@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('transactions.css') }}">{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Transactions</h1>
+  </div>
+  <details class="menu keys" id="keys">
+    <summary class="btn">{{ icon('keyboard') }}Keyboard shortcuts</summary>
+    <dl class="keys-list">
+      <div><dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next and previous row</dd></div>
+      <div><dt><kbd>c</kbd> <kbd>Enter</kbd></dt><dd>Change the category</dd></div>
+      <div><dt><kbd>o</kbd></dt><dd>Mark or unmark one-off</dd></div>
+      <div><dt><kbd>n</kbd></dt><dd>Next uncategorised row</dd></div>
+      <div><dt><kbd>x</kbd></dt><dd>Select the row</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>Cancel an edit</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Show or hide this list</dd></div>
+    </dl>
+  </details>
+</div>
+
+<form method="get" action="/transactions" class="filters" id="txn-filters" aria-label="Filters"
+      hx-get="/transactions" hx-target="#txn-results" hx-swap="outerHTML" hx-push-url="true">
+  <label class="field">Month
+    <select name="month" id="f-month">
+      <option value="all" {{ 'selected' if filters.month == 'all' }}>All time</option>
+      {% for m in months %}<option value="{{ m }}" {{ 'selected' if m == filters.month }}>{{ m | month_label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="field">Category
+    <select name="category_id" id="f-category">
+      <option value="">All categories</option>
+      {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if filters.category_id|string == c.id|string }}>{{ c.label }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if show_accounts %}
+  <label class="field">Account
+    <select name="account_id" id="f-account">
+      <option value="">All accounts</option>
+      {% for a in accounts %}<option value="{{ a.id }}" {{ 'selected' if filters.account_id|string == a.id|string }}>{{ a.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label class="check"><input type="checkbox" name="uncategorised" value="1" id="f-uncat" {{ 'checked' if filters.uncategorised }}> Uncategorised only</label>
+  <label class="field">Search
+    <input type="search" name="q" id="f-q" class="w-24ch" value="{{ filters.q }}" placeholder="Search descriptions" autocomplete="off"
+           hx-get="/transactions" hx-trigger="input changed delay:300ms" hx-include="closest form" hx-target="#txn-results" hx-swap="outerHTML" hx-push-url="true">
+  </label>
+  <button type="submit" class="btn">Apply</button>
+</form>
+
+{# The category chooser is rendered once: a datalist every combobox shares, and one editor the script clones into a row. #}
+<datalist id="cats">{% for c in categories %}<option value="{{ c.label }}"></option>{% endfor %}</datalist>
+<template id="cat-editor">{% with r={"id": 0, "description": ""}, error=None, value="" %}{% include "_cat_editor.html" %}{% endwith %}</template>
+<template id="rule-field"><div class="rule-field"><label class="field">Pattern <input name="pattern" class="pattern"></label><span class="field-help">Every description containing this is filed the same way.</span></div></template>
+<span id="cat-hint" hidden>Change category</span>
+
+{% include "_txn_results.html" %}
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('transactions.js') }}" defer></script>{% endblock %}

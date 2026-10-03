@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Projection · {{ scenario.name }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('projection.css') }}">{% endblock %}
+{% block content %}
+{% set last = milestones[-1] if milestones else none %}
+<div class="page-head">
+  <div>
+    <h1>Projection · {{ scenario.name }}</h1>
+    <p class="status-line">Where we could be in 1 to {{ inp.horizon_years }} years, starting from today's balances{% if cmp_name %}, compared with <b>{{ cmp_name }}</b>{% endif %}.</p>
+  </div>
+  <div class="tools page-tools">
+    <form method="get" action="/projection" class="tools" aria-label="Scenario">
+      <label class="field" for="scenario-select">Scenario
+        <select name="scenario" id="scenario-select">
+          {% for s in scenarios %}<option value="{{ s.id }}" {{ 'selected' if s.id == scenario.id }}>{{ s.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field" for="compare-select">Compare with
+        <select name="compare" id="compare-select">
+          <option value="">None</option>
+          {% for s in scenarios %}{% if s.id != scenario.id %}<option value="{{ s.id }}" {{ 'selected' if s.id|string == cmp_id|string }}>{{ s.name }}</option>{% endif %}{% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn">Apply</button>
+    </form>
+    <details class="menu" id="scenario-menu">
+      <summary class="btn" role="button" aria-haspopup="true">Scenario actions {{ icon('chevron-down', small=True) }}</summary>
+      <div class="menu-list">
+        <form method="post" action="/projection/{{ scenario.id }}/clone" class="menu-form">
+          <label class="field" for="clone-name">Duplicate {{ scenario.name }} as
+            <input name="name" id="clone-name" class="w-24ch" required maxlength="40" placeholder="Stretch">
+          </label>
+          <button type="submit" class="btn">{{ icon('plus', small=True) }}Duplicate scenario</button>
+        </form>
+        {% if not scenario.is_default %}
+        <form method="post" action="/projection/{{ scenario.id }}/delete" class="menu-form" data-confirm="Delete {{ scenario.name }}?" data-confirm-detail="Its {{ counts.levers }} lever{{ '' if counts.levers == 1 else 's' }} and {{ counts.items }} assumption{{ '' if counts.items == 1 else 's' }} go with it. This can't be undone.">
+          <button type="submit" class="btn btn-danger">{{ icon('trash', small=True) }}Delete scenario</button>
+        </form>
+        {% else %}
+        <p class="menu-note">The Base scenario can't be deleted.</p>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+</div>
+
+<dl class="facts inline" aria-label="Projection facts">
+  <div><dt>Starting net worth</dt><dd>{{ result.start_net_worth | money_whole }}</dd></div>
+  <div><dt>Horizon</dt><dd>{{ inp.horizon_years }} years</dd></div>
+  <div><dt>Contributions</dt><dd>{{ levers.explicit_contributions | money_whole }} a month</dd></div>
+  <div><dt>From levers</dt><dd id="fact-levers">{{ levers.extra_monthly | money_whole }} a month</dd></div>
+  <div><dt>Average net</dt><dd>{% if cash_flow.months %}{{ '+' if cash_flow.net > 0 }}{{ cash_flow.net | money_whole }} a month{% else %}—{% endif %}</dd></div>
+  <div><dt>Inflation</dt><dd>{{ inp.inflation_pct }}%</dd></div>
+</dl>
+
+<section class="strip" id="tiles" aria-label="Milestones">
+  {% for m in milestones %}
+  <div class="strip-item" data-year="{{ m.year }}">
+    <span class="strip-label">In {{ m.year }} year{{ 's' if m.year > 1 }}</span>
+    <span class="figure">{{ compact(m.net_worth) }}</span>
+    <span class="strip-delta is-same">Matches saved scenario</span>
+    <span class="strip-note"><span class="real">{{ m.net_worth_real | money_whole }}</span> in today's money{% if cmp_by_year[m.year] %} · {{ cmp_name }} {{ compact(cmp_by_year[m.year].net_worth) }}{% endif %}</span>
+  </div>
+  {% endfor %}
+</section>
+
+<p class="notice notice-warning" id="plan-notice" {% if not plan.exceeds %}hidden{% endif %}>Planned saving is <b id="plan-planned">{{ plan.planned | money_whole }} a month</b> (<span id="plan-parts">{{ plan.contributions | money_whole }} contributions plus {{ plan.from_levers | money_whole }} from levers</span>), but average net over {{ period }} is <b>{{ (plan.average_net or 0) | money_whole }}</b>. The plan puts away <b id="plan-gap">{{ (plan.gap or 0) | money_whole }}</b> a month more than you have been netting; surplus after contributions is <span id="plan-surplus">{{ (plan.surplus or 0) | money_whole }}</span>.</p>
+
+<section class="bench">
+  <div class="panel" id="chart-panel">
+    <div class="panel-head">
+      <h2>Net worth by asset class</h2>
+      <div class="tools"><button type="button" class="btn-quiet btn-sm" id="chart-table-toggle" data-table-toggle="projection" aria-expanded="false" aria-controls="twin-projection">{{ icon('table', small=True) }}<span class="btn-label">Table</span></button></div>
+    </div>
+    {% if chart.classes %}
+    <div id="chart-projection-wrap">
+      <div class="chart-wrap tall">
+        <canvas id="chart-projection" role="img" aria-label="Projected net worth {{ compact(last.net_worth) if last else '' }} in {{ inp.horizon_years }} years, stacked by asset class, with the in today's money line{% if cmp_name %} and the {{ cmp_name }} scenario{% endif %}; figures in the table"></canvas>
+        <div class="chart-labels" id="chart-labels" aria-hidden="true"></div>
+        <div class="chart-tip" id="chart-tip" hidden></div>
+      </div>
+      <div class="chart-foot" id="chart-foot">{% if payoff %}<span class="payoff" id="payoff">Mortgage paid off · {{ payoff.label }}</span>{% endif %}</div>
+      <ul class="legend" id="chart-legend" aria-label="Legend">
+        {% for c in chart.classes %}<li data-sw="{{ chart.swatches[c] }}">{{ c }}</li>{% endfor %}
+        <li class="line dashed" data-sw="ink">In today's money</li>
+        {% if cmp_name %}<li class="line" data-sw="ink-2">{{ cmp_name }}</li>{% endif %}
+        <li class="line" data-sw="ink-3" id="ghost-key" hidden>Saved scenario</li>
+      </ul>
+    </div>
+    <div class="table-scroll" id="twin-projection" hidden>
+      <table class="data">
+        <caption class="visually-hidden">Projected net worth by asset class, year by year</caption>
+        <thead><tr><th scope="col">Year</th>{% for c in chart.classes %}<th scope="col" class="num">{{ c }}</th>{% endfor %}<th scope="col" class="num">Net worth</th><th scope="col" class="num">In today's money</th>{% if cmp_name %}<th scope="col" class="num">{{ cmp_name }}</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for r in yearly %}
+        <tr><td>{{ 'Today' if r.year == 0 else r.year }}</td>{% for c in chart.classes %}<td class="num">{{ r.by_class.get(c, 0) | money_whole }}</td>{% endfor %}<td class="num"><b>{{ r.net_worth | money_whole }}</b></td><td class="num">{{ r.net_worth_real | money_whole }}</td>{% if cmp_name %}<td class="num">{{ cmp_yearly[r.month].net_worth | money_whole if cmp_yearly[r.month] else '—' }}</td>{% endif %}</tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">
+      <span class="empty-icon">{{ icon('net-worth') }}</span>
+      <h3>No balances yet</h3>
+      <p>The projection starts from today's balances. Update them on Net worth and the chart fills in.</p>
+      <a class="btn" href="/networth">Go to Net worth</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="panel" id="levers-panel">
+    <div class="panel-head"><h2>Levers</h2>{% if period %}<div class="tools"><span class="muted">Averages from {{ period }}</span></div>{% endif %}</div>
+    {% if levers.rows %}
+    <p class="status-line">Drag to cut a category; the chart and milestones follow. Nothing is kept until you choose <b>Save to scenario</b>.</p>
+    <form method="post" action="/projection/{{ scenario.id }}/levers" id="levers-form" aria-label="Spending levers">
+      <table class="data levers">
+        <thead><tr><th scope="col">Category</th><th scope="col" class="num">Average</th><th scope="col" class="cut">Cut</th><th scope="col" class="num pct">%</th><th scope="col" class="num">Saved</th></tr></thead>
+        <tbody>
+        {% for r in levers.rows %}
+        <tr data-cat="{{ r.id }}" data-avg="{{ '%.2f' % r.avg }}" data-name="{{ r.name }}">
+          <td><span class="lever-name">{{ r.name }}</span>{% if r.fixed_share > 0.5 %} <span class="badge">Fixed</span>{% elif r.discretionary %} <span class="badge">Flexible</span>{% endif %}</td>
+          <td class="num">{{ r.avg | money_whole }}</td>
+          <td class="cut"><input type="range" name="save__{{ r.id }}" id="lever-{{ r.id }}" class="lever" min="0" max="50" step="5" value="{{ r.pct | int }}" data-saved="{{ r.pct | int }}" aria-label="Cut {{ r.name }}" aria-valuetext="{{ r.pct | int }}%, saves {{ r.saved | money_whole }} a month"></td>
+          <td class="num pct">{{ r.pct | int }}%</td>
+          <td class="num pos saved">{{ r.saved | money_whole }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><td colspan="4">Total saved a month</td><td class="num pos" id="saved-total">{{ levers.saved_total | money_whole }}</td></tr></tfoot>
+      </table>
+      <p class="panel-note"><b>Fixed</b> is mostly direct debits, so a cut means switching provider. <b>Flexible</b> changes with habits.</p>
+      <p id="lever-status" class="lever-status" role="status"></p>
+      <div class="save-bar" id="save-bar" hidden>
+        <span class="save-bar-text" id="save-bar-text">No unsaved changes</span>
+        <div class="actions">
+          <button type="button" class="btn" id="levers-reset">Reset</button>
+          <button type="submit" class="btn btn-primary">{{ icon('check', small=True) }}Save to scenario</button>
+        </div>
+      </div>
+    </form>
+    {% else %}
+    <div class="empty">
+      <span class="empty-icon">{{ icon('spending') }}</span>
+      <h3>No complete month yet</h3>
+      <p>Import more statements and the spending levers appear here.</p>
+      <a class="btn" href="/statements">Go to Statements</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="bench even">
+  <div class="panel" id="surplus-panel">
+    <div class="panel-head"><h2>Surplus</h2></div>
+    {% if cash_flow.months %}
+    <dl class="facts inline equation" aria-label="How the surplus is worked out">
+      <div><dt>Income</dt><dd>{{ cash_flow.income | money_whole }}</dd></div>
+      <div><dt>Spending</dt><dd>− {{ cash_flow.outgoings | money_whole }}</dd></div>
+      <div><dt>Net</dt><dd class="{{ 'pos' if cash_flow.net > 0 else 'neg' if cash_flow.net < 0 }}">{{ '+' if cash_flow.net > 0 }}{{ cash_flow.net | money_whole }}</dd></div>
+      <div><dt>Already saved</dt><dd>− {{ levers.explicit_contributions | money_whole }}</dd></div>
+      <div><dt>Surplus</dt><dd class="{{ 'pos' if levers.derived_surplus > 0 else 'neg' if levers.derived_surplus < 0 }}">{{ '+' if levers.derived_surplus > 0 }}{{ levers.derived_surplus | money_whole }}</dd></div>
+    </dl>
+    {% else %}
+    <p class="status-line">No complete month yet, so there is no average income or spending to work from.</p>
+    {% endif %}
+    <div class="tools surplus-fields">
+      <label class="field" for="surplus-mode">Surplus
+        <select name="surplus_mode" id="surplus-mode" form="levers-form" data-saved="{{ 'save' if levers.surplus_mode == 'save' else 'ignore' }}">
+          <option value="ignore" {{ 'selected' if levers.surplus_mode != 'save' }}>Keep in current account (cautious)</option>
+          <option value="save" {{ 'selected' if levers.surplus_mode == 'save' }}>Save it each month</option>
+        </select>
+      </label>
+      <label class="field" for="surplus-override">Surplus £ a month
+        <input name="surplus_override" id="surplus-override" form="levers-form" class="num w-8ch" inputmode="decimal" data-saved="{{ saved.surplus_override }}" value="{{ form.surplus_override if 'surplus_override' in form else saved.surplus_override }}" placeholder="{{ '%.0f' % levers.derived_surplus }}"{% if errors.surplus_override %} aria-invalid="true" aria-describedby="err-surplus_override"{% endif %}>
+        {% if errors.surplus_override %}<span class="field-error" id="err-surplus_override">{{ errors.surplus_override }}</span>{% endif %}
+      </label>
+      <label class="field" for="surplus-target">Destination
+        <select name="surplus_target" id="surplus-target" form="levers-form" data-saved="{{ saved.surplus_target }}">
+          <option value="" {{ 'selected' if not levers.surplus_target }}>Current account ({{ '%.1f' % settings['proj.rate.cash'].value }}%)</option>
+          {% for it in targets %}{% if it.key != 'surplus' %}<option value="{{ it.key }}" {{ 'selected' if levers.surplus_target == it.key }}>{{ it.name }} ({{ '%.2f' % it.rate }}%)</option>{% endif %}{% endfor %}
+        </select>
+      </label>
+    </div>
+    <p class="panel-note">Bonuses inflate income; mark them one-off, or type the surplus you expect.</p>
+    <h3 class="sub-head">Added each month</h3>
+    <table class="data">
+      <tbody>
+        <tr><td>From spending cuts</td><td class="num pos" id="lev-saved">{{ levers.saved_total | money }}</td></tr>
+        <tr><td>From surplus</td><td class="num" id="lev-surplus">{{ levers.surplus_used | money }}</td></tr>
+      </tbody>
+      <tfoot><tr><td>Total extra saved</td><td class="num" id="lev-extra">{{ levers.extra_monthly | money }}</td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="panel" id="milestones-panel">
+    <div class="panel-head"><h2>Milestones</h2><div class="tools"><span class="muted" id="milestone-payoff">{% if payoff %}Mortgage paid off in month {{ payoff.month }}, {{ payoff.label }}{% endif %}</span></div></div>
+    <div class="table-scroll">
+      <table class="data" id="milestone-table">
+        <thead><tr><th scope="col">Year</th><th scope="col" class="num">Net worth</th><th scope="col" class="num">In today's money</th><th scope="col" class="num" data-priority="low">Liquid</th><th scope="col" class="num">Property equity</th><th scope="col" class="num">Mortgage</th><th scope="col" class="num" data-priority="low">Contributions</th><th scope="col" class="num" data-priority="low">Growth</th>{% if cmp_milestones %}<th scope="col" class="num">{{ cmp_name }}</th><th scope="col" class="num">Difference</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for m in milestones %}{% set c = cmp_by_year[m.year] if cmp_milestones else none %}
+        <tr data-year="{{ m.year }}"><td>{{ m.year }}</td><td class="num nw"><b>{{ m.net_worth | money_whole }}</b></td><td class="num real">{{ m.net_worth_real | money_whole }}</td>
+          <td class="num liquid" data-priority="low">{{ m.liquid | money_whole }}</td><td class="num equity">{{ m.equity | money_whole }}</td><td class="num mortgage">{{ m.mortgage | money_whole }}</td>
+          <td class="num contrib" data-priority="low">{{ m.contributions | money_whole }}</td><td class="num growth" data-priority="low">{{ '+' if m.gain - m.contributions > 0 }}{{ (m.gain - m.contributions) | money_whole }}</td>
+          {% if cmp_milestones %}<td class="num">{{ c.net_worth | money_whole if c else '—' }}</td><td class="num {{ 'pos' if c and c.net_worth > m.net_worth else 'neg' if c and c.net_worth < m.net_worth }}">{{ ('+' if c.net_worth - m.net_worth > 0) ~ ((c.net_worth - m.net_worth) | money_whole) if c else '—' }}</td>{% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<details class="disclosure panel" id="assumptions" {% if errors %}open{% endif %}>
+  <summary>Assumptions · {{ scenario.name }}</summary>
+  <p class="status-line">Leave a field blank to use what the statements show, or the <a href="/settings">Settings</a> default if nothing has been observed. Contributions are per month.</p>
+  <form method="post" action="/projection/{{ scenario.id }}/assumptions" id="assumptions-form">
+    <div class="table-scroll">
+      <table class="data">
+        <thead><tr><th scope="col">Item</th><th scope="col" data-priority="low">Type</th><th scope="col" class="num">Today</th><th scope="col" class="num">Growth % a year</th><th scope="col" class="num">£ a month</th><th scope="col">Until</th><th scope="col">Using</th></tr></thead>
+        <tbody>
+        {% for it in items %}{% set m = meta.get(it.key) %}
+        <tr class="{{ 'sub' if it.kind == 'mortgage' }}">
+          <td>{{ it.name }}</td><td data-priority="low">{{ kind_names.get(it.kind, it.kind) }}</td>
+          <td class="num {{ 'neg' if it.is_liability }}">{{ (-it.balance if it.is_liability else it.balance) | money_whole }}</td>
+          {% if not m %}
+            <td class="num">{{ '%.2f' % it.rate }}% <span class="muted small">cash default</span></td>
+            <td class="num">{{ it.contribution | money_whole }}</td><td></td>
+            <td class="muted small">From the levers and surplus; choose a destination to send it elsewhere</td>
+          {% elif it.kind == 'mortgage' %}
+            <td class="num">{{ it.rate }}% <span class="muted small">from the mortgage</span></td>
+            <td class="num">−{{ it.payment | money_whole }} <span class="muted small">payment</span></td><td></td>
+            <td class="muted small">Overpayment {{ it.overpayment | money_whole }} a month ({{ 'scenario' if scenario.mortgage_overpayment is not none else 'observed' }})</td>
+          {% elif it.kind in ('loan', 'other_liability') %}
+            <td class="num">{{ it.rate }}%</td><td class="num">−{{ it.payment | money_whole }}</td><td></td><td class="muted small">From the liability</td>
+          {% else %}
+            {% set rk = 'rate__' ~ m.ref_type ~ '__' ~ m.ref_id %}{% set ck = 'contrib__' ~ m.ref_type ~ '__' ~ m.ref_id %}
+            <td class="num"><input name="{{ rk }}" id="f-{{ rk }}" class="num w-6ch" inputmode="decimal" aria-label="Growth for {{ it.name }}" value="{{ form[rk] if rk in form else (m.override_rate if m.override_rate is not none else '') }}" placeholder="{{ '%.2f' % it.rate }}"{% if errors[rk] %} aria-invalid="true" aria-describedby="err-{{ rk }}"{% endif %}>
+              {% if errors[rk] %}<span class="field-error" id="err-{{ rk }}">{{ errors[rk] }}</span>{% endif %}</td>
+            <td class="num"><input name="{{ ck }}" id="f-{{ ck }}" class="num w-8ch" inputmode="decimal" aria-label="Monthly contribution to {{ it.name }}" value="{{ form[ck] if ck in form else ('%.2f' % m.override_contribution if m.override_contribution is not none else '') }}" placeholder="{{ '%.0f' % it.contribution }}"{% if errors[ck] %} aria-invalid="true" aria-describedby="err-{{ ck }}"{% endif %}>
+              {% if errors[ck] %}<span class="field-error" id="err-{{ ck }}">{{ errors[ck] }}</span>{% endif %}</td>
+            <td><input type="date" name="until__{{ m.ref_type }}__{{ m.ref_id }}" aria-label="Contributions to {{ it.name }} stop on" value="{{ m.until or '' }}"></td>
+            <td class="muted small">Rate: {{ it.rate_source }}{% if m.observed_rate is not none %} ({{ m.observed_rate }}% observed){% endif %} · contribution: {{ it.contribution_source }}{% if m.observed_contribution is not none %} ({{ m.observed_contribution | money_whole }} observed){% endif %}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-grid assumptions-grid">
+      <label class="field" for="f-name">Scenario name<input name="name" id="f-name" value="{{ form.name if 'name' in form else scenario.name }}" {{ 'readonly' if scenario.is_default }} maxlength="40"></label>
+      {% for key, label, current, ph, w, mode in [
+        ('horizon_years', 'Horizon, years', scenario.horizon_years or '', inp.horizon_years, 'w-6ch', 'numeric'),
+        ('inflation_pct', 'Inflation % a year', scenario.inflation_pct if scenario.inflation_pct is not none else '', inp.inflation_pct, 'w-6ch', 'decimal'),
+        ('property_growth_pct', 'Property growth % a year', scenario.property_growth_pct if scenario.property_growth_pct is not none else '', inp.property_growth_pct, 'w-6ch', 'decimal'),
+        ('mortgage_overpayment', 'Mortgage overpayment £ a month', scenario.mortgage_overpayment if scenario.mortgage_overpayment is not none else '', '%.0f' % meta._observed_overpayment, 'w-8ch', 'decimal'),
+        ('mortgage_rate_after_fix', 'Mortgage rate after the fix %', scenario.mortgage_rate_after_fix if scenario.mortgage_rate_after_fix is not none else '', 'Unchanged', 'w-6ch', 'decimal'),
+        ('contribution_growth_pct', 'Contributions grow % a year', scenario.contribution_growth_pct or '', '0', 'w-6ch', 'decimal')] %}
+      <label class="field" for="f-{{ key }}">{{ label }}<input name="{{ key }}" id="f-{{ key }}" class="num {{ w }}" inputmode="{{ mode }}" value="{{ form[key] if key in form else current }}" placeholder="{{ ph }}"{% if errors[key] %} aria-invalid="true" aria-describedby="err-{{ key }}"{% endif %}>
+        {% if errors[key] %}<span class="field-error" id="err-{{ key }}">{{ errors[key] }}</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+    <div class="actions form-actions"><button type="submit" class="btn">Save assumptions</button></div>
+  </form>
+</details>
+{% endblock %}
+{% block scripts %}
+<script id="proj-data" type="application/json">{{ chart | tojson }}</script>
+<script id="proj-saved" type="application/json">{{ saved | tojson }}</script>
+<script src="{{ static_url('vendor/chart.umd.js') }}"></script>
+<script src="{{ static_url('projection.js') }}" defer></script>
+{% endblock %}

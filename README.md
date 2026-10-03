@@ -2,12 +2,19 @@
   <img src="assets/slopfi-poster.jpg" alt="slopFi: a cracked piggy bank leaking noodles and banknotes, surrounded by stickers reading 'vibe coded', 'yolo budgeting', 'Budget? LOL' and 'not for prod'" width="420">
 </p>
 
-<p align="center"><em>Household finance, lovingly vibe coded. Not for prod.</em></p>
+<p align="center"><em>Household finance, Vibe coded with no fucks given</em></p>
 
 # slopFi
 
-Parse bank statements, categorise every transaction, and see where the money goes,
-all in a local web UI backed by a single SQLite file. Nothing leaves your machine.
+I built this to serve my own needs, in my own household. Will it work for you? Who knows but that's the world we live in now.
+
+Should you put this on the internet? Probably not.
+
+This is built to run locally, or on a home network on docker deployment. If you expose this out with all your bank information, congratulations.
+
+There is no tracking, this app does not reach out to the internet (at least that's what Claude said).
+
+It only supports Monzo/HSBC and whatver I need - If you want to extend it, fork and do as you wish! (As you can probably tell this is not going to be a maintained project)
 
 <p align="center">
   <img src="assets/screenshots/overview.png" alt="Overview: the month against a typical month, where the money went, and the month-close checklist" width="900">
@@ -77,24 +84,6 @@ The database is `slopfi.db` in the working directory (override with `SLOPFI_DB=p
 at its foot, the month-close checklist for the latest open month ("Close September · 3 of 5"); each row
 links to the page that clears it, and the counts update as you work. Below 1024px the sidebar becomes an
 icon rail (the checklist moves to the top of Overview); below 768px it becomes a top bar.
-
-### Closing a month
-
-Once a month, when the statements are in, work down the checklist:
-
-1. **Review** shows the five steps for the month with what is still outstanding: statements imported
-   (every account covers the month), transactions categorised, one-offs checked, balances updated
-   (none older than 30 days), targets checked.
-2. **Transactions** opens on that month. File the uncategorised rows (they are tinted and open for
-   editing), tick **Make a rule** to file every matching description the same way, and mark bonuses,
-   refunds and other unusual payments **One-off** so they stay out of averages and projections.
-3. **Spending** checks the period's averages against the one before, the fixed costs, and any
-   category over its target.
-4. **Net worth**: press **Update balances** for accounts whose statements carry no balance (Monzo pots,
-   for example) and revalue the house or investments with **Add asset** or the row's **Edit**.
-5. **Close** the month from Review (or the checklist card) once every step is done. Spending then counts
-   the month in its averages even if a statement left a gap, Overview's status line says the month is
-   closed, and the checklist moves on to the next month. **Reopen** puts a month back on the checklist.
 
 ### The pages
 
@@ -170,19 +159,3 @@ is used as a fallback (shown as a **From bank** badge) when no rule matches.
 
 Sign convention everywhere: negative = money leaving the family, including credit
 card spend. A credit card balance is stored as a negative balance.
-
-## Roadmap
-
-- Pair both sides of a transfer between your own accounts, so pot contributions show as "saved this month".
-- More statement formats: one parser per bank, behind the same interface (see `src/slopfi/parsers/`).
-- Year-on-year view once twelve months of history exist.
-- A house-move event in the projection: deposit and fees out, mortgage swap, new fixed costs.
-- Monte Carlo bands on invested assets for the 10-year view.
-
-## Privacy
-
-Statements, the database (`*.db`), `sources.toml` and `rules.local.json` are gitignored.
-`tests/test_no_personal_data.py` fails if a tracked file contains a real-looking sort code
-and account number, an IBAN, a UK postcode or an email address, and it also checks every
-string you list in a local, gitignored `pii.local.txt` (one per line). Put your own name,
-account numbers and references there before you commit.

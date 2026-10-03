@@ -1,3 +1,5 @@
+import re
+
 from fastapi.testclient import TestClient
 
 from slopfi import db, importer
@@ -48,3 +50,14 @@ def test_trends_budget_and_one_off_routes(db_path):
     assert r.status_code == 200 and "one-off" in r.text and "checked" in r.text
     conn = db.connect(db_path)
     assert conn.execute("SELECT one_off FROM transactions WHERE id = ?", (txn,)).fetchone()[0] == 1
+
+
+def test_make_a_rule_opts_out_of_form_restore(db_path):
+    """Saving with a rule sends HX-Refresh; on reload Firefox restores checkbox state by position, so a ticked
+    "Make a rule" box would land on whichever row now sits in that slot. (Row Select/One-off are reset by transactions.js.)"""
+    conn = db.connect(db_path)
+    importer.import_statement(conn, _stmt(), "a.pdf", "hash1")
+    conn.close()
+    page = TestClient(app).get("/transactions?uncategorised=1").text
+    boxes = re.findall(r'<input type="checkbox" name="create_rule"[^>]*>', page)
+    assert boxes and all('autocomplete="off"' in b for b in boxes)

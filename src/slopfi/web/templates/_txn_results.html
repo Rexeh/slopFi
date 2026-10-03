@@ -1,4 +1,8 @@
 {# The swapped region: result line, selection toolbar, the table, Export CSV. Row swaps target `closest tr`. #}
+{#- A sortable header: a plain link to the next sort, which transactions.js turns into a filter-form submit. -#}
+{%- macro th(key, label, cls="", priority="") -%}{%- set h = sort_heads[key] -%}
+<th scope="col"{% if cls %} class="{{ cls }}"{% endif %}{% if priority %} data-priority="{{ priority }}"{% endif %}{% if h.aria %} aria-sort="{{ h.aria }}"{% endif %}><a class="sort" href="{{ h.href }}" data-col="{{ key }}" data-sort="{{ h.sort }}" data-dir="{{ h.dir }}">{{ label }}{% if h.aria %}{{ icon('arrow-up' if h.aria == 'ascending' else 'arrow-down', small=True) }}{% endif %}</a></th>
+{%- endmacro %}
 <div id="txn-results">
   <div class="result-bar">
     <p class="result-line" id="result-line" role="status">{{ result_line }}</p>
@@ -20,8 +24,8 @@
   <table class="data txns" id="txn-table" hx-target="closest tr" hx-swap="outerHTML">
     <thead><tr>
       <th scope="col"><input type="checkbox" id="sel-all" aria-label="Select every row shown"></th>
-      <th scope="col">Date</th><th scope="col" data-priority="low">Account</th><th scope="col">Description</th><th scope="col" class="num">Amount</th>
-      <th scope="col">Category</th><th scope="col" data-priority="low">Source</th><th scope="col">One-off</th>
+      {{ th("date", "Date") }}{{ th("account", "Account", priority="low") }}{{ th("description", "Description") }}{{ th("amount", "Amount", cls="num") }}
+      {{ th("category", "Category") }}{{ th("source", "Source", priority="low") }}{{ th("one_off", "One-off") }}
     </tr></thead>
     <tbody>
     {% for r in rows %}{% include "_txn_row.html" %}{% endfor %}

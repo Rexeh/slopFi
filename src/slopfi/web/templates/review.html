@@ -44,9 +44,28 @@
       <span class="step-icon">{{ icon('check' if s.done else 'todo', title=('Done' if s.done else 'To do')) }}</span>
       <div class="step-body">
         <h3>{{ s.title }}</h3>
+        {% if s.key == 'statements' and s.gaps %}
+        {#- Each account short of the month on its own line: what is imported and the dates still to import. -#}
+        <p>Every account needs statements covering all of {{ c.month | month_name }}. Import the missing dates on Statements; if a bank's next statement isn't out yet, the step clears once it is imported.</p>
+        <ul class="spikes">
+        {% for g in s.gaps %}
+          <li><span><b>{{ g.name }}</b> {{ g.imported }} · <b>{{ g.needed }}</b> still to import</span></li>
+        {% endfor %}
+        </ul>
+        {% elif s.key == 'one_offs' and s.spikes %}
+        {#- Each flagged category on its own line, with the figures Review compares and a link to its transactions. -#}
+        <p>{{ 'This category is' if s.spikes | length == 1 else 'These categories are' }} far above typical. Tick <b>One-off</b> on anything that won't repeat (a bonus, an annual bill, a big trip) to keep it out of averages and projections. A category clears once it is back under its limit, not counting one-offs.</p>
+        <ul class="spikes">
+        {% for sp in s.spikes %}
+          <li><span><b>{{ sp.name }}</b> {{ sp.amount | money_whole }} in {{ [c.month] | month_range }} · typical {{ sp.typical | money_whole }} ({{ sp.months | month_range }}) · {{ '%.1f' | format(sp.ratio) }}× <span class="muted">· limit {{ sp.limit | money_whole }}</span></span>
+            <a class="btn-quiet" href="{{ sp.href }}">Check {{ sp.name }}{{ icon('chevron-right', small=True) }}</a></li>
+        {% endfor %}
+        </ul>
+        {% else %}
         <p>{{ s.detail }}</p>
+        {% endif %}
       </div>
-      <a class="btn-quiet step-action" href="{{ s.href }}">{{ s.action }}{{ icon('chevron-right', small=True) }}</a>
+      {% if not (s.key == 'one_offs' and s.spikes) %}<a class="btn-quiet step-action" href="{{ s.href }}">{{ s.action }}{{ icon('chevron-right', small=True) }}</a>{% endif %}
     </li>
   {% endfor %}
   </ol>

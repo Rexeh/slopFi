@@ -206,6 +206,19 @@ def recurring(conn: sqlite3.Connection, account_id: int | None = None) -> list[d
     return out
 
 
+# Sortable transaction columns -> ORDER BY expression, sorted as displayed (category by its full label, source by its
+# badge). Uncategorised rows have NULLs, which SQLite sorts first ascending. Ties fall back to newest first.
+TXN_SORTS = {
+    "date": "t.date",
+    "account": "a.name COLLATE NOCASE",
+    "description": "t.description COLLATE NOCASE",
+    "amount": "t.amount",
+    "category": "(COALESCE(p.name || ' / ', '') || c.name) COLLATE NOCASE",
+    "source": "CASE t.categorised_by WHEN 'source' THEN 'From bank' WHEN 'manual' THEN 'Manual' WHEN 'rule' THEN 'Rule' END",
+    "one_off": "t.one_off",
+}
+
+
 def transactions(
     conn: sqlite3.Connection,
     month: str | None = None,
@@ -214,6 +227,8 @@ def transactions(
     uncategorised: bool = False,
     account_id: int | None = None,
     limit: int | None = None,
+    sort: str = "date",
+    descending: bool = True,
 ) -> list[sqlite3.Row]:
     where = ["1=1"]
     params: list = []
@@ -232,6 +247,10 @@ def transactions(
     if account_id is not None:
         where.append("t.account_id = ?")
         params.append(account_id)
+    d = "DESC" if descending else "ASC"
+    order = f"t.date {d}, t.statement_id {d}, t.seq {d}"
+    if sort != "date":
+        order = f"{TXN_SORTS[sort]} {d}, t.date DESC, t.statement_id DESC, t.seq DESC"
     sql = f"""
         SELECT t.*, c.name AS category_name, p.name AS parent_name, c.kind AS category_kind,
                a.name AS account_name, r.pattern AS rule_pattern
@@ -239,7 +258,7 @@ def transactions(
         JOIN accounts a ON a.id = t.account_id
         LEFT JOIN rules r ON r.id = t.rule_id
         WHERE {' AND '.join(where)}
-        ORDER BY t.date DESC, t.statement_id DESC, t.seq DESC
+        ORDER BY {order}
     """
     if limit:
         sql += f" LIMIT {int(limit)}"
@@ -283,6 +302,19 @@ def category_options(conn: sqlite3.Connection) -> list[dict]:
             out.append({"id": top["id"], "label": top["name"], "kind": top["kind"]})
         for ch in top["children"]:
             out.append({"id": ch["id"], "label": f"{top['name']} / {ch['name']}", "kind": top["kind"]})
+    return out
+
+
+def category_filter_options(conn: sqlite3.Connection) -> list[dict]:
+    """category_options plus each parent ahead of its children ('Shopping (all)'): a filter can be a whole parent,
+    which a transaction's category cannot."""
+    out = []
+    for top in categories_tree(conn):
+        out.append({"id": top["id"], "label": top["name"],
+                    "option": f"{top['name']} (all)" if top["children"] else top["name"], "kind": top["kind"]})
+        for ch in top["children"]:
+            label = f"{top['name']} / {ch['name']}"
+            out.append({"id": ch["id"], "label": label, "option": label, "kind": top["kind"]})
     return out
 
 

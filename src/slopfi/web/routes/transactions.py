@@ -17,11 +17,34 @@ templates.env.filters.setdefault("money_pence", overview.money_pence)
 templates.env.filters.setdefault("date_label", overview.date_label)
 
 RESULTS = "txn-results"   # the id of the swapped region; htmx names it in HX-Target
+SORT_FIRST = {"date": "desc", "amount": "asc", "one_off": "desc"}   # a header's first click; the rest open A–Z
 
 
-def _filters(month, category_id, q, uncategorised, account_id) -> dict:
+def _sort(sort, dir) -> tuple[str, str]:
+    """?sort=&dir= -> a known column and asc/desc, or ("", "") for the default, newest first."""
+    if sort not in reports.TXN_SORTS:
+        return "", ""
+    dir = dir if dir in ("asc", "desc") else SORT_FIRST.get(sort, "asc")
+    return ("", "") if (sort, dir) == ("date", "desc") else (sort, dir)
+
+
+def _filters(month, category_id, q, uncategorised, account_id, sort=None, dir=None) -> dict:
+    sort, dir = _sort(sort, dir)
     return {"month": month or "all", "category_id": category_id or "", "q": (q or "").strip(),
-            "uncategorised": "1" if uncategorised in ("1", "true", "on", True) else "", "account_id": account_id or ""}
+            "uncategorised": "1" if uncategorised in ("1", "true", "on", True) else "", "account_id": account_id or "",
+            "sort": sort, "dir": dir}
+
+
+def _sort_heads(filters: dict) -> dict:
+    """Per sortable column: aria-sort when it is the active one, and the sort its header link asks for next."""
+    active, current = filters["sort"] or "date", filters["dir"] or "desc"
+    heads = {}
+    for key in reports.TXN_SORTS:
+        on = key == active
+        sort, dir = _sort(key, ("asc" if current == "desc" else "desc") if on else SORT_FIRST.get(key, "asc"))
+        heads[key] = {"aria": ("ascending" if current == "asc" else "descending") if on else None, "sort": sort,
+                      "dir": dir, "href": "/transactions?" + urlencode({**filters, "sort": sort, "dir": dir})}
+    return heads
 
 
 def resolve_category(options: list[dict], text: str | None) -> tuple[int | None, str | None]:
@@ -62,20 +85,25 @@ def _result_line(filters: dict, rows: list, total: float, categories: list[dict]
             line += f" from {name}"
     if n:
         line += f" · net {overview.money_pence(total, signed=True)}"
+    if any(r["one_off"] for r in rows):     # the figure averages, projections and the one-offs check use
+        line += f" · {overview.money_pence(sum(r['amount'] for r in rows if not r['one_off']), signed=True)} without one-offs"
     return line
 
 
 def _context(conn, filters: dict) -> dict:
     rows = reports.transactions(conn, month=filters["month"], category_id=_opt_int(filters["category_id"]),
                                 q=filters["q"] or None, uncategorised=bool(filters["uncategorised"]),
-                                account_id=_opt_int(filters["account_id"]))
+                                account_id=_opt_int(filters["account_id"]), sort=filters["sort"] or "date",
+                                descending=filters["dir"] != "asc")
     categories = reports.category_options(conn)
+    filter_categories = reports.category_filter_options(conn)
     accounts = reports.accounts(conn)
     total = sum(r["amount"] for r in rows)
     return {"rows": rows, "total": total, "filters": filters, "categories": categories, "accounts": accounts,
+            "filter_categories": filter_categories,
             "months": reports.months_available(conn), "query": urlencode(filters), "suggest": categorise.suggest_pattern,
-            "show_accounts": len({a["owner"] for a in accounts}) > 1,
-            "result_line": _result_line(filters, rows, total, categories, accounts),
+            "show_accounts": len({a["owner"] for a in accounts}) > 1, "sort_heads": _sort_heads(filters),
+            "result_line": _result_line(filters, rows, total, filter_categories, accounts),
             "has_any": bool(conn.execute("SELECT 1 FROM transactions LIMIT 1").fetchone())}
 
 
@@ -92,13 +120,13 @@ def _row(request: Request, conn, txn_id: int, error: str | None = None, value: s
 def transactions(
     request: Request, conn: Conn,
     month: str | None = None, category_id: str | None = None, q: str | None = None,
-    uncategorised: str | None = None, account_id: str | None = None,
+    uncategorised: str | None = None, account_id: str | None = None, sort: str | None = None, dir: str | None = None,
 ):
     if not request.query_params:
         # The bare page opens on the month being closed (all of history is ~0.5MB of rows); "All time" stays in the
         # Month select, and any link that carries a filter but no month still means all months.
         month = review.latest_open_month(conn) or next(iter(reports.months_available(conn)), None)
-    filters = _filters(month, category_id, q, uncategorised, account_id)
+    filters = _filters(month, category_id, q, uncategorised, account_id, sort, dir)
     partial = request.headers.get("HX-Target") == RESULTS and not request.headers.get("HX-History-Restore-Request")
     return _page(request, conn, filters, partial)
 
@@ -140,18 +168,18 @@ def toggle_one_off(request: Request, conn: Conn, txn_id: int, one_off: str = For
 
 
 # ------------------------------------------------------------------- bulk
-def _bulk_filters(month, category_id, q, uncategorised, account_id) -> dict:
-    return _filters(month or "all", category_id, q, uncategorised, account_id)
+def _bulk_filters(month, category_id, q, uncategorised, account_id, sort, dir) -> dict:
+    return _filters(month or "all", category_id, q, uncategorised, account_id, sort, dir)
 
 
 @router.post("/transactions/bulk/category", response_class=HTMLResponse)
 def bulk_category(
     request: Request, conn: Conn, ids: Annotated[list[str], Form()] = [], category: str = Form(""),
     month: str = Form(""), category_id: str = Form(""), q: str = Form(""), uncategorised: str = Form(""),
-    account_id: str = Form(""),
+    account_id: str = Form(""), sort: str = Form(""), dir: str = Form(""),
 ):
     """Apply one category to every selected row, then re-render the results under the current filters."""
-    filters = _bulk_filters(month, category_id, q, uncategorised, account_id)
+    filters = _bulk_filters(month, category_id, q, uncategorised, account_id, sort, dir)
     txn_ids = [int(i) for i in ids if i.isdigit()]
     options = reports.category_options(conn)
     cat, error = resolve_category(options, category)
@@ -169,9 +197,9 @@ def bulk_category(
 def bulk_one_off(
     request: Request, conn: Conn, ids: Annotated[list[str], Form()] = [], one_off: str = Form("1"),
     month: str = Form(""), category_id: str = Form(""), q: str = Form(""), uncategorised: str = Form(""),
-    account_id: str = Form(""),
+    account_id: str = Form(""), sort: str = Form(""), dir: str = Form(""),
 ):
-    filters = _bulk_filters(month, category_id, q, uncategorised, account_id)
+    filters = _bulk_filters(month, category_id, q, uncategorised, account_id, sort, dir)
     txn_ids = [int(i) for i in ids if i.isdigit()]
     if not txn_ids:
         return hx_events(_page(request, conn, filters, True), toast="Select at least one transaction.", kind="error")
@@ -186,12 +214,14 @@ def bulk_one_off(
 @router.get("/export/transactions.csv")
 def export_transactions(
     conn: Conn, month: str | None = None, category_id: str | None = None, q: str | None = None,
-    uncategorised: str | None = None, account_id: str | None = None,
+    uncategorised: str | None = None, account_id: str | None = None, sort: str | None = None, dir: str | None = None,
 ):
     category_id, account_id = _opt_int(category_id), _opt_int(account_id)
     uncategorised = uncategorised in ("1", "true", "on")
+    sort, dir = _sort(sort, dir)
     rows = reports.transactions(conn, month=month or "all", category_id=category_id, q=q,
-                                uncategorised=uncategorised, account_id=account_id)
+                                uncategorised=uncategorised, account_id=account_id, sort=sort or "date",
+                                descending=dir != "asc")
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["date", "account", "type", "description", "amount", "category", "subcategory", "categorised_by", "one_off"])

@@ -173,12 +173,28 @@ def test_review_empty_state(db_path):
 
 def test_coverage_gap_wording(conn):
     importer.import_statement(conn, _stmt(), "a.pdf", "hash1")
-    assert review.coverage_gaps(conn, "2026-06") == ["HSBC UK current …1020 starts 26 Jun"]
-    assert review.coverage_gaps(conn, "2026-07") == ["HSBC UK current …1020 ends 25 Jul"]
-    assert review.coverage_gaps(conn, "2026-09") == ["HSBC UK current …1020 missing"]
+    june, july, sept = (review.coverage_gaps(conn, m) for m in ("2026-06", "2026-07", "2026-09"))
+    assert [(g["name"], g["imported"], g["needed"]) for g in june + july + sept] == [
+        ("HSBC UK current …1020", "imported from 26 Jun", "1–25 Jun"),
+        ("HSBC UK current …1020", "imported up to 25 Jul", "26–31 Jul"),
+        ("HSBC UK current …1020", "nothing imported for September", "all of September"),
+    ]
+    assert july[0]["text"] == "HSBC UK current …1020 needs 26–31 Jul"
+    step = next(s for s in review.checklist(conn, "2026-07", today=date(2026, 8, 3))["steps"] if s["key"] == "statements")
+    assert step["detail"] == "HSBC UK current …1020 needs 26–31 Jul." and step["gaps"] == july
     assert review.date_label("2026-09-05") == "5 Sep 2026" and review.date_label(None) == "never"
     stale = review.checklist(conn, "2026-06", today=date(2026, 12, 1))
     assert "last updated 25 Jul 2026" in next(s for s in stale["steps"] if s["key"] == "balances")["detail"]
+
+
+def test_review_page_lists_each_statement_gap(db_path):
+    conn = db.connect(db_path)
+    importer.import_statement(conn, _stmt(), "a.pdf", "hash1")
+    conn.close()
+    html = TestClient(app).get("/review?month=2026-07").text
+    step = html[html.index('id="step-statements"'):html.index('id="step-categorise"')]
+    assert "Every account needs statements covering all of July" in step          # says what to do
+    assert "<b>HSBC UK current …1020</b> imported up to 25 Jul · <b>26–31 Jul</b> still to import" in step
 
 
 def test_no_raw_enums_or_bare_confirms_in_setup_templates():

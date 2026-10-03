@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import calendar
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 
 from . import reports
 from .db import now_iso
@@ -56,24 +56,33 @@ def _day(d: date) -> str:
     return f"{d.day} {calendar.month_abbr[d.month]}"
 
 
-def coverage_gaps(conn: sqlite3.Connection, month: str) -> list[str]:
-    """One sentence fragment per spending account that does not cover the whole month:
-    'Amex Alex ends 5 Sep', 'Monzo Sam starts 3 Sep', 'HSBC Joint only 3–20 Sep', 'Monzo Joint missing'."""
+def _span(a: date, b: date) -> str:
+    """Days within one month: '6–30 Sep', or '30 Sep' for a single day."""
+    return _day(a) if a == b else f"{a.day}–{_day(b)}"
+
+
+def coverage_gaps(conn: sqlite3.Connection, month: str) -> list[dict]:
+    """One entry per spending account whose statements do not cover the whole month: its name, what is imported
+    ('imported up to 5 Sep'), the dates still needed ('6–30 Sep') and a one-line `text` ('Amex …1005 needs 6–30 Sep')."""
     y, mo = int(month[:4]), int(month[5:7])
     start, end = date(y, mo, 1), date(y, mo, calendar.monthrange(y, mo)[1])
+    day = timedelta(days=1)
     out = []
     for a in reports.coverage(conn):
         if a["kind"] == "savings":
             continue
         first, last = date.fromisoformat(a["first"]), date.fromisoformat(a["last"])
         if first > end or last < start:
-            out.append(f"{a['name']} missing")
+            imported, needed = f"nothing imported for {calendar.month_name[mo]}", f"all of {calendar.month_name[mo]}"
         elif first > start and last < end:
-            out.append(f"{a['name']} only {first.day}–{_day(last)}")
+            imported, needed = f"imported {_span(first, last)} only", f"{_span(start, first - day)} and {_span(last + day, end)}"
         elif first > start:
-            out.append(f"{a['name']} starts {_day(first)}")
+            imported, needed = f"imported from {_day(first)}", _span(start, first - day)
         elif last < end:
-            out.append(f"{a['name']} ends {_day(last)}")
+            imported, needed = f"imported up to {_day(last)}", _span(last + day, end)
+        else:
+            continue
+        out.append({"name": a["name"], "imported": imported, "needed": needed, "text": f"{a['name']} needs {needed}"})
     return out
 
 
@@ -103,8 +112,10 @@ def _spikes(conn: sqlite3.Connection, month: str) -> list[dict]:
         avg = sum(c["values"].get(m, 0.0) for m in earlier) / len(earlier)
         this = c["values"].get(month, 0.0)
         if avg > 0 and this > SPIKE_FACTOR * avg:
+            # Checked on Transactions, largest first: spending is negative, so it ascends; income descends.
+            href = f"/transactions?month={month}&category_id={c['id']}&sort=amount&dir={'desc' if c['kind'] == 'income' else 'asc'}"
             out.append({"id": c["id"], "name": c["name"], "kind": c["kind"], "amount": this, "typical": avg,
-                        "ratio": this / avg})
+                        "ratio": this / avg, "limit": SPIKE_FACTOR * avg, "months": sorted(earlier), "href": href})
     out.sort(key=lambda s: -s["ratio"])
     return out
 
@@ -154,7 +165,7 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
     steps = [
         {"key": "statements", "title": "Statements imported", "done": not gaps,
          "count": f"{n_accounts - len(gaps)} of {n_accounts}", "href": "/statements", "action": "Import",
-         "detail": "; ".join(gaps) if gaps else "Every account covers the month."},
+         "detail": "; ".join(g["text"] for g in gaps) + "." if gaps else "Every account covers the month.", "gaps": gaps},
         {"key": "categorise", "title": "Categorise", "done": uncat_n == 0,
          "count": f"{uncat_n} left" if uncat_n else "none left",
          "href": f"/transactions?month={month}&uncategorised=1", "action": f"File them ({uncat_n})" if uncat_n else "Open",
@@ -162,7 +173,7 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
                    else "Everything is filed.", "amount": uncat_amount},
         {"key": "one_offs", "title": "One-offs checked", "done": not spikes,
          "count": f"{len(spikes)} to check" if spikes else "0",
-         "href": f"/transactions?month={month}" + (f"&category_id={spikes[0]['id']}" if spikes else ""), "action": "Check",
+         "href": f"/review?month={month}#step-one_offs", "action": "Check",
          "detail": "; ".join(f"{s['name']} {reports.money_whole(s['amount'])} is {s['ratio']:.1f}× typical" for s in spikes)
                    if spikes else "No category is far above its usual level.", "spikes": spikes},
         {"key": "balances", "title": "Update balances", "done": not stale,

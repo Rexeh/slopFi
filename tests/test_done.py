@@ -312,8 +312,8 @@ def test_seeded_pages_show_what_was_seeded(seeded, db_path):
 
 def test_transactions_hide_low_priority_columns_at_768():
     page = TEMPLATE_TEXT["_txn_results.html"]
-    heads = re.findall(r"<th[^>]*>", page)
-    low = [h for h in heads if 'data-priority="low"' in h]
-    assert len(low) == 2
+    heads = re.findall(r'\bth\("(\w+)", "[^"]*"([^)]*)\)', page)          # the sortable headers, after Select
+    low = [i + 2 for i, (_, rest) in enumerate(heads) if 'priority="low"' in rest]
+    assert low == [3, 7]
     css = (STATIC / "transactions.css").read_text()
     assert re.search(r"@media \(max-width: 768px\).*?nth-child\(3\).*?nth-child\(7\)[^{]*\{\s*display: none", css, re.S)

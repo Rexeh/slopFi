@@ -24,6 +24,10 @@ table.txns td:nth-child(5) { text-align: right; font-variant-numeric: tabular-nu
 table.txns td:nth-child(6) { min-width: 240px; }
 table.txns :is(th, td):nth-child(8) { text-align: center; }
 table.txns td input[type=checkbox] { vertical-align: middle; }
+/* Sortable headers: quiet links; the active one is full ink with its direction arrow. */
+table.txns th a.sort { display: inline-flex; align-items: center; gap: 2px; color: inherit; text-decoration: none; }
+table.txns th a.sort:hover { color: var(--color-ink); text-decoration: underline; }
+table.txns th[aria-sort] a.sort { color: var(--color-ink); }
 table.txns tbody tr:focus-visible, table.txns tbody tr:focus { outline: none; box-shadow: inset 3px 0 0 var(--color-focus); background: var(--color-surface-tint); }
 table.txns tbody tr.is-current td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
 table.txns tr.uncat.is-editing { background: var(--color-warning-tint); }

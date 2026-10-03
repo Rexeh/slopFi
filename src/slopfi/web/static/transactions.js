@@ -1,4 +1,4 @@
-// Transactions: keyboard filing (j/k/c/o/Enter/n/x), the cloned category editor, "Make a rule", One-off, selection.
+// Transactions: keyboard filing (j/k/c/o/Enter/n/x), the cloned category editor, "Make a rule", One-off, selection, sorting.
 // Rows carry no per-row handlers (a 577-row month must stay small): everything is delegated from the document,
 // so a swapped results region or row needs no rebinding. Cells are found by column position.
 (function () {
@@ -130,7 +130,20 @@
     else if (t.matches("[name=create_rule]")) ruleField(t);
     else if (t.matches(`#txn-table tbody ${ONE}`)) oneOff(t);
   });
+  // A header's sort goes through the filter form, so the form keeps it for the next filter change and the URL updates.
+  let sortFocus = null;
+  function sortBy(link) {
+    const form = doc.getElementById("txn-filters");
+    if (!form || !window.htmx) return false;
+    form.elements.sort.value = link.dataset.sort;
+    form.elements.dir.value = link.dataset.dir;
+    sortFocus = link.dataset.col;
+    htmx.trigger(form, "submit");
+    return true;
+  }
   doc.addEventListener("click", (e) => {
+    const sort = e.target.closest("#txn-table thead a[data-col]");
+    if (sort) { if (sortBy(sort)) e.preventDefault(); return; }
     const edit = e.target.closest("button.cat");
     if (edit) { openEditor(edit.closest("tr")); return; }
     const cancel = e.target.closest("[data-cancel]");
@@ -168,6 +181,9 @@
   // After a swap the row ids are the same; keep the current marker and the toolbar's count in step.
   doc.body.addEventListener("htmx:afterSettle", () => {
     syncSelection();
+    const head = sortFocus && doc.querySelector(`#txn-table thead a[data-col="${sortFocus}"]`);
+    sortFocus = null;
+    if (head) head.focus();
     const again = currentId && doc.getElementById(currentId);
     if (again) {
       again.classList.add("is-current");
@@ -175,5 +191,8 @@
       if (doc.activeElement === doc.body || !doc.activeElement) focusRow(again);
     }
   });
+  // A rule save sends HX-Refresh, and Firefox restores checkbox ticks by position on reload, landing them on whichever
+  // rows now sit there. Rows are too many to carry autocomplete="off", so put back what the server rendered.
+  $$("#txn-table tbody input[type=checkbox]").forEach((b) => { b.checked = b.defaultChecked; });
   syncSelection();
 })();

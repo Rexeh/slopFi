@@ -10,6 +10,12 @@
 .review-steps .step-body p { margin-top: var(--space-1); color: var(--color-ink-2); max-width: 80ch; overflow-wrap: anywhere; }
 .review-steps .step.is-done .step-body p { color: var(--color-ink-3); }
 .step-action { white-space: nowrap; gap: var(--space-1); }
+/* One-offs: each flagged category with its figures and a link to its transactions, largest first. */
+.spikes { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.spikes li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-1) 0; border-top: 1px solid var(--color-border); font-size: var(--text-table); font-variant-numeric: tabular-nums; }
+.spikes li:first-child { border-top: 0; }
+.spikes .btn-quiet { white-space: nowrap; gap: var(--space-1); }
+.step-body:has(.spikes):last-child { grid-column: 2 / -1; }   /* one-offs: no step action, each line has its own */
 .step-action .icon { transition: transform var(--duration-fast) var(--ease-enter); }
 .step-action:hover .icon { transform: translateX(2px); }
 .review-foot { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--color-border-strong); }

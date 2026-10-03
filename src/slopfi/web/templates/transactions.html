@@ -31,7 +31,7 @@
   <label class="field">Category
     <select name="category_id" id="f-category">
       <option value="">All categories</option>
-      {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if filters.category_id|string == c.id|string }}>{{ c.label }}</option>{% endfor %}
+      {% for c in filter_categories %}<option value="{{ c.id }}" {{ 'selected' if filters.category_id|string == c.id|string }}>{{ c.option }}</option>{% endfor %}
     </select>
   </label>
   {% if show_accounts %}
@@ -47,6 +47,7 @@
     <input type="search" name="q" id="f-q" class="w-24ch" value="{{ filters.q }}" placeholder="Search descriptions" autocomplete="off"
            hx-get="/transactions" hx-trigger="input changed delay:300ms" hx-include="closest form" hx-target="#txn-results" hx-swap="outerHTML" hx-push-url="true">
   </label>
+  <input type="hidden" name="sort" value="{{ filters.sort }}"><input type="hidden" name="dir" value="{{ filters.dir }}">
   <button type="submit" class="btn">Apply</button>
 </form>
 

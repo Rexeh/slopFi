@@ -248,7 +248,7 @@ def status_line(checklist: dict, today: date | None = None) -> dict:
             facts.append((f"{len(stale)} balances", f" are over {review.STALE_DAYS} days old"))
     st = steps.get("statements")
     if st and not st["done"]:
-        facts.append(("statements", " are missing or stop early: " + st["detail"]))
+        facts.append(("statements", " are missing or stop early: " + "; ".join(g["text"] for g in st["gaps"])))
     one = steps.get("one_offs")
     if one and not one["done"] and one.get("spikes"):
         s = one["spikes"][0]

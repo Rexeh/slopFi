@@ -1,0 +1,4 @@
+{#- After a change to one row, with the page's filters known: the row itself while it still matches them (the server
+    sends HX-Reswap delete when it does not), and the result line out of band. -#}
+{% if keep %}{% include "_txn_row.html" %}{% endif %}
+<p class="result-line" id="result-line" role="status" hx-swap-oob="true">{{ result_line }}</p>

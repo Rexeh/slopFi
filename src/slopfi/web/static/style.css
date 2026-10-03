@@ -355,13 +355,20 @@ tr:has(input[type="range"]:active) { background: var(--color-accent-tint); }
 .tabs [role="tab"]:hover { color: var(--color-ink); box-shadow: none; background: none; }
 .tabs [role="tab"][aria-selected="true"] { color: var(--color-ink); border-bottom-color: var(--color-accent); }
 .tabs [role="tab"]:focus-visible { border-radius: var(--radius-sm); }
-#toast { position: fixed; left: var(--space-5); bottom: var(--space-5); z-index: 40; display: flex; flex-direction: column; gap: var(--space-2); max-width: min(420px, calc(100vw - 40px)); }
-.toast { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-size: var(--text-table); background: var(--color-surface-raised); color: var(--color-ink); border-radius: var(--radius-md); box-shadow: var(--shadow-3); animation: toast-in var(--duration-base) var(--ease-enter); }
+/* Toasts sit bottom right, away from the sidebar's month-close checklist and near where rows are worked on; the
+   coloured edge sets them apart from the raised panels around them. */
+#toast { position: fixed; right: var(--space-5); bottom: var(--space-5); z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); max-width: min(440px, calc(100vw - 40px)); }
+.toast { display: flex; align-items: center; gap: var(--space-2); min-width: 280px; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); font-size: var(--text-base); background: var(--color-surface-raised); color: var(--color-ink); border-left: 3px solid var(--color-accent); border-radius: var(--radius-md); box-shadow: var(--shadow-3); animation: toast-in var(--duration-base) var(--ease-enter); }
 .toast.is-leaving { opacity: 0; transition: opacity var(--duration-fast) var(--ease-exit); }
+.toast-success { border-left-color: var(--color-positive); }
+.toast-error { border-left-color: var(--color-negative); }
+.toast-warning { border-left-color: var(--color-warning); }
 .toast-success .icon { color: var(--color-positive); }
 .toast-error .icon { color: var(--color-negative); }
 .toast-info .icon { color: var(--color-accent); }
-.toast .btn-quiet { min-height: 24px; margin-left: auto; }
+.toast .toast-action { font-weight: 600; color: var(--color-accent); }
+.toast .btn-quiet { min-height: 24px; }
+.toast .toast-text { margin-right: auto; }
 .toast .toast-close { width: 24px; height: 24px; min-height: 24px; padding: 0; color: var(--color-ink-3); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
 dialog.confirm { width: min(440px, calc(100vw - 32px)); padding: var(--space-5); border: 0; border-radius: var(--radius-md); background: var(--color-surface-raised); color: var(--color-ink); box-shadow: var(--shadow-3); }
@@ -472,6 +479,8 @@ dialog[open]::backdrop { animation: fade-in var(--duration-slow) var(--ease-ente
   .page-head .filters, .page-head .tools { width: 100%; }
   .filters > label, .tools > label { width: auto; max-width: 100%; }
   .filters select, .tools select, .filters input:not([type="checkbox"]), .tools input:not([type="checkbox"]) { max-width: 100%; }
+  #toast { left: var(--space-4); right: var(--space-4); bottom: var(--space-4); max-width: none; align-items: stretch; }
+  .toast { min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   :root { --duration-fast: 0ms; --duration-base: 0ms; --duration-slow: 0ms; }

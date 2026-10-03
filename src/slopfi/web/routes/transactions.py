@@ -4,13 +4,13 @@ from __future__ import annotations
 import csv
 import io
 from typing import Annotated
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from ... import categorise, overview, reports, review
-from ..app import Conn, _opt_int, hx_events, month_label, render, templates
+from ..app import Conn, _opt_int, flash, hx_events, month_label, render, templates
 
 router = APIRouter()
 templates.env.filters.setdefault("money_pence", overview.money_pence)
@@ -111,6 +111,42 @@ def _page(request: Request, conn, filters: dict, partial: bool) -> HTMLResponse:
     return render(request, "_txn_results.html" if partial else "transactions.html", **_context(conn, filters))
 
 
+def _default_month(conn) -> str | None:
+    """The bare page opens on the month being closed (all of history is ~0.5MB of rows); "All time" stays in the
+    Month select, and any link that carries a filter but no month still means all months."""
+    return review.latest_open_month(conn) or next(iter(reports.months_available(conn)), None)
+
+
+def _view(conn, view: str | None) -> dict | None:
+    """The filters the page is showing, from the query string htmx pushed to its URL (not the filter form, which may
+    hold changes not yet applied). None when the request did not say, so a row is re-rendered as before."""
+    if view is None:
+        return None
+    params = parse_qs(view.lstrip("?"))
+    get = lambda key: (params.get(key) or [None])[0]   # noqa: E731
+    return _filters(get("month") if params else _default_month(conn), get("category_id"), get("q"),
+                    get("uncategorised"), get("account_id"), get("sort"), get("dir"))
+
+
+def _after_change(request: Request, conn, txn_id: int, filters: dict | None) -> HTMLResponse:
+    """The response to a change to one row. With the page's filters known: the row (or nothing, when it no longer
+    matches them) plus the result line out of band; the whole results region once the
+    last row has gone, so the empty state shows."""
+    if filters is None:
+        return _row(request, conn, txn_id)
+    ctx = _context(conn, filters)
+    if not ctx["rows"]:
+        resp = render(request, "_txn_results.html", **ctx)
+        resp.headers["HX-Retarget"], resp.headers["HX-Reswap"] = f"#{RESULTS}", "outerHTML"
+        return resp
+    keep = any(r["id"] == txn_id for r in ctx["rows"])
+    resp = render(request, "_txn_changed.html", keep=keep, r=reports.transaction(conn, txn_id),
+                  suggest=categorise.suggest_pattern, error=None, value=None, result_line=ctx["result_line"])
+    if not keep:
+        resp.headers["HX-Reswap"] = "delete"
+    return resp
+
+
 def _row(request: Request, conn, txn_id: int, error: str | None = None, value: str | None = None) -> HTMLResponse:
     return render(request, "_txn_row.html", r=reports.transaction(conn, txn_id), suggest=categorise.suggest_pattern,
                   error=error, value=value)
@@ -123,9 +159,7 @@ def transactions(
     uncategorised: str | None = None, account_id: str | None = None, sort: str | None = None, dir: str | None = None,
 ):
     if not request.query_params:
-        # The bare page opens on the month being closed (all of history is ~0.5MB of rows); "All time" stays in the
-        # Month select, and any link that carries a filter but no month still means all months.
-        month = review.latest_open_month(conn) or next(iter(reports.months_available(conn)), None)
+        month = _default_month(conn)
     filters = _filters(month, category_id, q, uncategorised, account_id, sort, dir)
     partial = request.headers.get("HX-Target") == RESULTS and not request.headers.get("HX-History-Restore-Request")
     return _page(request, conn, filters, partial)
@@ -135,36 +169,67 @@ def transactions(
 def set_transaction_category(
     request: Request, conn: Conn, txn_id: int,
     category: str = Form(""), category_id: str = Form(""), create_rule: str = Form(""), pattern: str = Form(""),
+    view: str | None = Form(None),
 ):
-    """The row's combobox posts a label; an id is accepted too. Unknown text re-renders the row with the error."""
+    """The row's combobox posts a label; an id is accepted too. Unknown text re-renders the row with the error.
+    `view` is the page's query string: a row that no longer matches it leaves the list (see _after_change)."""
     if category_id:
         cat, error = int(category_id), None
     else:
         cat, error = resolve_category(reports.category_options(conn), category)
     if error:
         return _row(request, conn, txn_id, error=error, value=category)
+    before = reports.transaction(conn, txn_id)
     categorise.set_category(conn, txn_id, cat)
-    rule_applied = 0
-    if cat is not None and create_rule and pattern.strip():
-        categorise.create_rule(conn, pattern=pattern, category_id=cat)
-        rule_applied = categorise.apply_rules(conn)
-    resp = _row(request, conn, txn_id)
-    if rule_applied:
-        resp.headers["HX-Refresh"] = "true"
     row = reports.transaction(conn, txn_id)
     label = row["category_name"] if row and row["category_id"] else None
     toast = f"Filed under {label}" if label else "Category cleared"
-    if rule_applied:
-        toast += f" · rule made, {rule_applied} more filed"
+    undo = {"label": "Undo", "post": f"/transactions/{txn_id}/undo", "target": f"#{RESULTS}", "values": {
+        "category_id": before["category_id"] or "", "categorised_by": before["categorised_by"] or "",
+        "rule_id": before["rule_id"] or ""}} if before else None
+    if cat is not None and create_rule and pattern.strip():
+        # No Undo once a rule is made: the rule is its own thing, switched off or deleted on Categories and rules.
+        categorise.create_rule(conn, pattern=pattern, category_id=cat)
+        rule_applied, undo = categorise.apply_rules(conn), None
+        toast += f" · rule made, {rule_applied} more filed" if rule_applied else " · rule made"
+        if rule_applied:
+            # The page reloads to show every row the rule filed; a toast sent now would die with it, so it waits in
+            # the flash cookie for the reloaded page.
+            resp = flash(_row(request, conn, txn_id), toast)
+            resp.headers["HX-Refresh"] = "true"
+            return resp
+    return hx_events(_after_change(request, conn, txn_id, _view(conn, view)), refresh=True, toast=toast, action=undo)
+
+
+@router.post("/transactions/{txn_id:int}/undo", response_class=HTMLResponse)
+def undo_category(
+    request: Request, conn: Conn, txn_id: int,
+    category_id: str = Form(""), categorised_by: str = Form(""), rule_id: str = Form(""), view: str | None = Form(None),
+):
+    """Undo a filing: put the row's previous category back as it was, then re-render the results so the row returns
+    to its place under the page's filters."""
+    try:
+        categorise.restore_category(conn, txn_id, _opt_int(category_id), categorised_by or None, _opt_int(rule_id))
+    except ValueError:
+        return hx_events(HTMLResponse("", status_code=204), toast="That category no longer exists.", kind="error")
+    row = reports.transaction(conn, txn_id)
+    toast = f"Back under {row['category_name']}" if row and row["category_id"] else "Back to Uncategorised"
+    filters = _view(conn, view)
+    if filters is None:
+        return hx_events(_row(request, conn, txn_id), refresh=True, toast=toast)
+    resp = _page(request, conn, filters, True)
+    resp.headers["HX-Retarget"], resp.headers["HX-Reswap"] = f"#{RESULTS}", "outerHTML"
     return hx_events(resp, refresh=True, toast=toast)
 
 
 @router.post("/transactions/{txn_id:int}/one_off", response_class=HTMLResponse)
-def toggle_one_off(request: Request, conn: Conn, txn_id: int, one_off: str = Form("")):
-    """The checkbox posts its value only when ticked, so a blank means off."""
+def toggle_one_off(request: Request, conn: Conn, txn_id: int, one_off: str = Form(""), view: str | None = Form(None)):
+    """The checkbox posts its value only when ticked, so a blank means off. The result line's "without one-offs"
+    figure changes with it, so it is re-rendered too when the page's filters are known."""
     on = one_off in ("1", "on", "true")
     reports.set_one_off(conn, txn_id, on)
-    return hx_events(_row(request, conn, txn_id), refresh=True, toast="Marked one-off" if on else "One-off removed")
+    return hx_events(_after_change(request, conn, txn_id, _view(conn, view)), refresh=True,
+                     toast="Marked one-off" if on else "One-off removed")
 
 
 # ------------------------------------------------------------------- bulk

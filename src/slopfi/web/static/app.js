@@ -31,25 +31,29 @@
   // ------------------------------------------------------------------ toasts
   const region = $("#toast");
   const ICON = { success: "check", error: "alert", info: "info", warning: "alert" };
+  // `action` is {label, href} for a link, or {label, post, values, target} for a button that posts via htmx (Undo).
+  // A toast with an action stays longer; none leaves under the pointer or focus; only the newest few stay.
+  const TOAST_MS = 5000, TOAST_ACTION_MS = 8000, TOAST_MAX = 3;
   function toast(message, kind, action) {
     if (!region) return;
     kind = ICON[kind] ? kind : "info";
-    const el = doc.createElement("div");
-    el.className = `toast toast-${kind}`;
-    el.innerHTML = `${svg(ICON[kind])}<span class="toast-text"></span>`;
+    const el = Object.assign(doc.createElement("div"), { className: `toast toast-${kind}` });
+    const ms = action ? TOAST_ACTION_MS : TOAST_MS, posts = action && action.post && window.htmx;
+    let timer = null;
+    el.innerHTML = `${svg(ICON[kind])}<span class="toast-text"></span><button type="button" class="btn-quiet toast-close" aria-label="Dismiss">${svg("close")}</button>`;
     $(".toast-text", el).textContent = message;
-    if (action && action.label && action.href) {
-      const a = doc.createElement("a"); a.className = "btn-quiet"; a.href = action.href; a.textContent = action.label; el.appendChild(a);
+    const remove = el.dismiss = () => { clearTimeout(timer); el.classList.add("is-leaving"); setTimeout(() => el.remove(), reduced.matches ? 0 : 150); };
+    if (action && action.label && (action.href || posts)) {
+      const a = Object.assign(doc.createElement(posts ? "button" : "a"), { className: "btn-quiet toast-action", textContent: action.label }, posts ? { type: "button" } : { href: action.href });
+      if (posts) { a.dataset.post = action.post; a.addEventListener("click", () => { remove(); htmx.ajax("POST", action.post, { target: action.target || "body", swap: "outerHTML", values: action.values || {} }); }); }
+      $(".toast-close", el).before(a);
     }
-    const close = doc.createElement("button");
-    close.type = "button"; close.className = "btn-quiet toast-close"; close.setAttribute("aria-label", "Dismiss");
-    close.innerHTML = svg("close");
-    el.appendChild(close);
-    const remove = () => { el.classList.add("is-leaving"); setTimeout(() => el.remove(), reduced.matches ? 0 : 150); };
-    close.addEventListener("click", remove);
-    region.appendChild(el);
-    if (kind !== "error") setTimeout(remove, 5000);
-    return el;
+    $(".toast-close", el).addEventListener("click", remove); region.appendChild(el);
+    Array.from(region.querySelectorAll(".toast:not(.is-leaving)")).slice(0, -TOAST_MAX).forEach((old) => old.dismiss());
+    const resume = () => { clearTimeout(timer); if (kind !== "error" && !el.matches(":hover, :focus-within")) timer = setTimeout(remove, ms); };
+    ["mouseenter", "focusin"].forEach((n) => el.addEventListener(n, () => clearTimeout(timer)));
+    el.addEventListener("mouseleave", resume); el.addEventListener("focusout", () => setTimeout(resume, 0));
+    resume(); return el;
   }
   // A redirect queues its toast in a cookie set by flash() on the server; consume it once.
   const flash = doc.cookie.split("; ").find((c) => c.startsWith("flash="));

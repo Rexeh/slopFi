@@ -198,13 +198,15 @@ def redirect(url: str, message: str | None = None, kind: str = "success") -> Red
     return flash(resp, message, kind) if message else resp
 
 
-def hx_events(response: Response, refresh: bool = False, toast: str | None = None, kind: str = "success") -> Response:
-    """HX-Trigger header: `refresh` re-fetches the sidebar checklist; `toast` is announced by app.js."""
+def hx_events(response: Response, refresh: bool = False, toast: str | None = None, kind: str = "success",
+              action: dict | None = None) -> Response:
+    """HX-Trigger header: `refresh` re-fetches the sidebar checklist; `toast` is announced by app.js, with an optional
+    `action`: {label, href} for a link, or {label, post, values, target} for a button that posts (Undo)."""
     events: dict = {}
     if refresh:
         events["refresh"] = True
     if toast:
-        events["toast"] = {"message": toast, "kind": kind}
+        events["toast"] = {"message": toast, "kind": kind, **({"action": action} if action else {})}
     if events:
         response.headers["HX-Trigger"] = json.dumps(events)
     return response

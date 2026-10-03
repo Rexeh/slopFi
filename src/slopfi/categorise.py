@@ -167,6 +167,26 @@ def set_category(conn: sqlite3.Connection, transaction_id: int, category_id: int
             )
 
 
+def restore_category(conn: sqlite3.Connection, transaction_id: int, category_id: int | None,
+                     categorised_by: str | None, rule_id: int | None) -> None:
+    """Put back a transaction's category exactly as it was (Undo): the category, who filed it and by which rule.
+    A rule deleted since is dropped; an unknown category raises ValueError."""
+    if category_id is None:
+        set_category(conn, transaction_id, None)
+        return
+    if not conn.execute("SELECT 1 FROM categories WHERE id = ?", (category_id,)).fetchone():
+        raise ValueError(f"no category {category_id}")
+    if categorised_by not in ("rule", "manual", "source"):
+        categorised_by = "manual"
+    if rule_id is not None and not conn.execute("SELECT 1 FROM rules WHERE id = ?", (rule_id,)).fetchone():
+        rule_id = None
+    if categorised_by == "rule" and rule_id is None:
+        categorised_by = "manual"
+    with conn:
+        conn.execute("UPDATE transactions SET category_id = ?, categorised_by = ?, rule_id = ? WHERE id = ?",
+                     (category_id, categorised_by, rule_id if categorised_by == "rule" else None, transaction_id))
+
+
 def create_rule(
     conn: sqlite3.Connection,
     pattern: str,

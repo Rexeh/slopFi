@@ -145,6 +145,7 @@ say what goes with the item; saves confirm with a short message at the bottom le
 | `o` | Mark or unmark the row as a one-off |
 | `n` | Jump to the next uncategorised row |
 | `x` | Select the row (then apply a category or One-off to every selected row) |
+| `u` | Undo the last filing (while its message is showing) |
 | `Esc` | Cancel an edit, or close the shortcut list |
 | `?` | Show or hide the shortcut list |
 

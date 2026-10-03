@@ -1,4 +1,4 @@
-// Transactions: keyboard filing (j/k/c/o/Enter/n/x), the cloned category editor, "Make a rule", One-off, selection, sorting.
+// Transactions: keyboard filing (j/k/c/o/Enter/n/x/u), the cloned category editor, "Make a rule", One-off, selection, sorting.
 // Rows carry no per-row handlers (a 577-row month must stay small): everything is delegated from the document,
 // so a swapped results region or row needs no rebinding. Cells are found by column position.
 (function () {
@@ -166,17 +166,38 @@
       case "c": case "Enter": e.preventDefault(); openEditor(current()); break;
       case "o": e.preventDefault(); toggleOneOff(current()); break;
       case "n": e.preventDefault(); nextUncategorised(); break;
+      case "u": { const undo = $$("#toast .toast-action[data-post]").pop(); if (undo) { e.preventDefault(); undo.click(); } break; }
       case "x": { e.preventDefault(); const box = current() && $("td:first-child input", current()); if (box) { box.checked = !box.checked; syncSelection(); } break; }
       case "?": { e.preventDefault(); const keys = doc.getElementById("keys"); if (keys) keys.open = !keys.open; break; }
       case "Escape": { const keys = doc.getElementById("keys"); if (keys && keys.open) keys.open = false; break; }
       default: break;
     }
   });
-  // Bulk actions post the selected rows' ids (rows carry no name/value pairs of their own).
+  // A change to one row (category, one-off, Undo) carries the filters the page shows, from its URL, so the server can
+  // drop a row that no longer matches them and update the result line. A saved row may leave: the next row (or the
+  // previous, at the end) becomes current. Undo brings its row back as current.
+  const ROW_POST = /^\/transactions\/(\d+)\/(category|one_off|undo)$/;
+  let fallbackId = null, restoreFocus = false;
   doc.body.addEventListener("htmx:configRequest", (e) => {
+    const m = ROW_POST.exec(e.detail.path);
+    if (m) {
+      e.detail.formData.set("view", location.search || "?");   // "?" is the bare page: a blank would read as unsent
+      const tr = doc.getElementById(`txn-${m[1]}`);
+      if (m[2] === "undo") { currentId = `txn-${m[1]}`; fallbackId = null; restoreFocus = true; }
+      else if (tr) { currentId = tr.id; fallbackId = (tr.nextElementSibling || tr.previousElementSibling || {}).id || null; }
+      return;
+    }
+    // Bulk actions post the selected rows' ids (rows carry no name/value pairs of their own).
     if (!e.detail.elt.closest("[data-bulk]")) return;
     e.detail.formData.delete("ids");
     $$(SEL).filter((b) => b.checked).forEach((b) => e.detail.formData.append("ids", b.closest("tr").id.slice(4)));
+  });
+  // A row leaving the list is deleted, and htmx settles on the detached row, so no settle event reaches here: move to
+  // the next row now, before the leaving row goes.
+  doc.body.addEventListener("htmx:beforeSwap", (e) => {
+    const how = e.detail.xhr && e.detail.xhr.getResponseHeader("HX-Reswap");
+    const next = how && how.startsWith("delete") && fallbackId && doc.getElementById(fallbackId);
+    if (next) { fallbackId = null; focusRow(next); }
   });
   // After a swap the row ids are the same; keep the current marker and the toolbar's count in step.
   doc.body.addEventListener("htmx:afterSettle", () => {
@@ -184,11 +205,19 @@
     const head = sortFocus && doc.querySelector(`#txn-table thead a[data-col="${sortFocus}"]`);
     sortFocus = null;
     if (head) head.focus();
-    const again = currentId && doc.getElementById(currentId);
+    let again = currentId && doc.getElementById(currentId);
+    if (!again && fallbackId && doc.getElementById(fallbackId)) {
+      again = doc.getElementById(fallbackId);
+      currentId = again.id;
+    }
+    const restore = restoreFocus;
+    fallbackId = null;
+    restoreFocus = false;
     if (again) {
       again.classList.add("is-current");
-      // A swapped row loses its tabindex; if focus fell to the body, put it back on the row by id.
-      if (doc.activeElement === doc.body || !doc.activeElement) focusRow(again);
+      // A swapped row loses its tabindex; if focus fell to the body, put it back on the row by id. Undo always lands
+      // on the row it brought back (focus was on the toast's button, which is leaving).
+      if (restore || doc.activeElement === doc.body || !doc.activeElement) focusRow(again);
     }
   });
   // A rule save sends HX-Refresh, and Firefox restores checkbox ticks by position on reload, landing them on whichever

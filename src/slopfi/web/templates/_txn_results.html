@@ -33,6 +33,13 @@
   </table>
   </div>
   <p class="panel-note">Choosing a category saves it for this transaction. Tick <b>Make a rule</b> to file every matching description the same way.<br>Source: <b>Manual</b> you chose it · <b>Rule</b> a rule filed it · <b>From bank</b> the bank's own label. One-off keeps a payment out of averages and projections.</p>
+  {% elif has_any and filters.uncategorised and not filters.q %}
+  <section class="panel empty">
+    <span class="empty-icon">{{ icon('check') }}</span>
+    <h2>All filed{% if filters.month != 'all' %} for {{ filters.month | month_label }}{% endif %}</h2>
+    <p>Nothing left to categorise here.</p>
+    <div class="actions"><a class="btn btn-primary" href="/review">Go to Review</a><a class="btn" href="/transactions?month={{ filters.month }}{% if filters.account_id %}&amp;account_id={{ filters.account_id }}{% endif %}">Show all transactions</a></div>
+  </section>
   {% elif has_any %}
   <section class="panel empty">
     <span class="empty-icon">{{ icon('search') }}</span>

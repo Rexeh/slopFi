@@ -24,6 +24,13 @@ account = "HSBC Joint"
 owner = "joint"
 kind = "current"
 
+# A Barclays PDF statement identifies its account the same way (sort code and account number).
+[[source]]
+path = "data/alex/barclays"
+account = "Barclays Alex"
+owner = "alex"
+kind = "current"
+
 # A Monzo PDF statement also carries every pot; each pot becomes its own savings account
 # named "Monzo pot: <name>" with the same owner.
 [[source]]

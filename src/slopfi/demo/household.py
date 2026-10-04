@@ -58,7 +58,7 @@ class Account:
     name: str                       # what the app calls it (sources.toml)
     owner: str
     kind: str                       # current | credit_card
-    fmt: str                        # hsbc_pdf | amex_pdf | monzo_pdf | monzo_csv
+    fmt: str                        # hsbc_pdf | amex_pdf | barclays_pdf | monzo_pdf | monzo_csv
     folder: str                     # statements/<person>/<account>
     holder: str                     # the name printed on the statement
     sort_code: str = ""

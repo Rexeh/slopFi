@@ -14,7 +14,12 @@ This is built to run locally, or on a home network on docker deployment. If you 
 
 There is no tracking, this app does not reach out to the internet (at least that's what Claude said).
 
-It only supports Monzo/HSBC and whatver I need - If you want to extend it, fork and do as you wish! (As you can probably tell this is not going to be a maintained project)
+It only officially supports
+- Monzo
+- HSBC
+- Barclays
+- Amex
+If you want to extend it, fork and do as you wish! (As you can probably tell this is not going to be a maintained project)
 
 <p align="center">
   <img src="assets/screenshots/overview.png" alt="Overview: the month against a typical month, where the money went, and the month-close checklist" width="900">
@@ -177,6 +182,7 @@ move into savings.
 | Parser | Format | Account detection | Reconciliation |
 |---|---|---|---|
 | `hsbc_current` | HSBC UK current account PDF | sort code + account number | summary totals and running balances |
+| `barclays_current` | Barclays UK current account PDF | sort code + account number | At a glance totals and daily balances |
 | `amex_card` | American Express UK PDF | membership number | previous/closing balance, credits, debits |
 | `monzo_pdf` | Monzo PDF statement (personal or joint), pots included | sort code + account number; each pot becomes its own savings account | per section: totals, closing balance, running balances |
 | `monzo_csv` | Monzo CSV export (account or pot) | none: choose the account on import | none available; stable transaction IDs de-duplicate |

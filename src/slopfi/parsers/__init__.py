@@ -81,9 +81,9 @@ class ParsedStatement:
 
 
 def available_parsers():
-    from . import amex_card, hsbc_current, monzo_csv, monzo_pdf
+    from . import amex_card, barclays_current, hsbc_current, monzo_csv, monzo_pdf
 
-    return [hsbc_current, amex_card, monzo_pdf, monzo_csv]
+    return [hsbc_current, barclays_current, amex_card, monzo_pdf, monzo_csv]
 
 
 def detect_parser(path: str | Path):

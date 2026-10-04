@@ -282,20 +282,21 @@ M_DATE, M_DESC, M_AMOUNT, M_BAL = 40, 145, 445, 540
 M_LINE, M_GAP, M_BOTTOM, M_DESC_WIDTH, M_SIZE = 8, 24, 780, 215, 7
 
 
-def _wrap(pieces: list[str]) -> list[str]:
+def _wrap(pieces: list[str], width: float = M_DESC_WIDTH, size: float = M_SIZE, limit: int | None = 3) -> list[str]:
+    """Word-wrap each piece to the column width; each piece starts on a new line."""
     out: list[str] = []
     for piece in pieces:
         current = ""
         for word in piece.split():
             trial = f"{current} {word}".strip()
-            if current and pymupdf.get_text_length(trial, fontname=FONT, fontsize=M_SIZE) > M_DESC_WIDTH:
+            if current and pymupdf.get_text_length(trial, fontname=FONT, fontsize=size) > width:
                 out.append(current)
                 current = word
             else:
                 current = trial
         if current:
             out.append(current)
-    return out[:3]
+    return out[:limit] if limit else out
 
 
 def _signed(pence: int) -> str:
@@ -415,6 +416,161 @@ def write_monzo_csv(acct: Account, hh: Household, path: Path) -> Path:
 
 
 # ===================================================================== all
+# ================================================================== Barclays
+# barclays_current: date x0 < 92 ("02 Mar", no year, first row of each day only), description from 109 (92 for the
+# "Start balance" / "End balance" rows) wrapped at ~140pt, amounts right-aligned under the header words:
+# "Money out" ends at 305, "Money in" at 361, "Balance" at 414. The amount sits on the transaction's first row;
+# the balance is printed once per day, on the first row of the day's last transaction. The type is not a column:
+# it is the printed prefix ("Card Payment to", "Direct Debit to", ...), so Txn.code is the parser's code and the
+# writer prints the prefix for it. A card payment's purchase date ("On 28 Feb") runs on from the payee; "Ref: ..."
+# and "Timed at ..." lines start their own line. Overdrawn balances are printed with a leading minus (assumed:
+# the reference statement never goes overdrawn).
+B_DATE, B_DESC, B_DESC_BAL, B_OUT, B_IN, B_BAL = 58, 109, 92, 306, 359, 413
+B_ROW, B_BOTTOM, B_DESC_WIDTH, B_SIZE = 11, 745, 140, 8
+B_PREFIX = {"DD": "Direct Debit to", "CARD": "Card Payment to", "CR": "Received From", "BP": "Bill Payment to",
+            "ATM": "Cash Machine Withdrawal at", "SO": "Standing Order to", "TFR": "Transfer to", "FP": "Payment to"}
+
+
+def _signed_money(pence: int) -> str:
+    return f"-{_money(pence)}" if pence < 0 else _money(pence)
+
+
+def _barclays_lines(t: Txn) -> list[str]:
+    """The printed rows of one transaction's description: prefix + payee (+ the inline "On dd Mon"), wrapped,
+    then each further line (Ref:, Timed at, ...) wrapped on its own."""
+    prefix = B_PREFIX.get(t.code, t.code)
+    head = f"{prefix} {t.lines[0]}".strip()
+    pieces: list[str] = []
+    on = next((line for line in t.lines[1:] if line.startswith("On ")), "")
+    if t.fx:
+        # the parser's "EUR 3.50 @ 1.16" and fee lines are printed as Barclays' one long sentence
+        currency, foreign, rate = t.fx
+        head = f"{head} {currency} {_money(foreign)} {on} at VISA Exchange Rate {rate}"
+        if t.fee_pence:
+            head += f" The Final GBP Amount Includes A Non-Sterling Transaction Fee of £ {_money(t.fee_pence)}"
+    for line in t.lines[1:]:
+        if line.startswith("On ") and not pieces:
+            if not t.fx:
+                head = f"{head} {line}"
+        elif t.fx and (" @ " in line or line.startswith("Non-Sterling")):
+            continue
+        else:
+            pieces.append(line)
+    return _wrap([head, *pieces], width=B_DESC_WIDTH, size=B_SIZE, limit=None)
+
+
+def _barclays_header(pdf: _Pdf, y: float) -> None:
+    pdf.text(B_DATE, y, "Date", bold=True, size=B_SIZE)
+    pdf.text(B_DESC_BAL, y, "Description", bold=True, size=B_SIZE)
+    pdf.text(B_OUT - 1, y, "Money out", bold=True, right=True, size=B_SIZE)
+    pdf.text(B_IN + 2, y, "Money in", bold=True, right=True, size=B_SIZE)
+    pdf.text(B_BAL + 1, y, "Balance", bold=True, right=True, size=B_SIZE)
+    pdf.line(y + 4, 55, 420)
+
+
+def _barclays_page_top(pdf: _Pdf, acct: Account, page_no: int) -> float:
+    """A continuation page: the account line, the section title and the table header. Returns the first row y."""
+    pdf.text(59, 23, f"Sort code {acct.sort_code} \u2022 Account number {acct.number}", size=B_SIZE)
+    pdf.text(61, 45, "Your transactions", size=12, bold=True)
+    _barclays_header(pdf, 66)
+    return 83
+
+
+def _barclays_footer(pdf: _Pdf, page_no: int, continued: bool) -> None:
+    if continued:
+        pdf.text(409, 755, "Continued", size=B_SIZE, right=True)
+    pdf.text(57, 800, "Demo Bank UK PLC. Not authorised by anyone: this is fictional demo data.", size=7)
+    pdf.text(57, 815, DISCLAIMER, size=7)
+    pdf.text(571, 808, f"Page {page_no}", size=B_SIZE, right=True)
+
+
+def write_barclays(acct: Account, y: int, m: int, path: Path, period: tuple[date, date] | None = None) -> Path:
+    """One Barclays-style statement for a calendar month, or for `period` (start, end) when given: a Barclays
+    statement runs from the day after the previous one to the statement date, which can straddle a year end."""
+    start, end = period or _month_bounds(y, m)
+    txns = _in(acct.txns, start, end)
+    opening = acct.balance_on(start - timedelta(days=1))
+    money_in, money_out = _totals(txns)
+    closing = opening + money_in - money_out
+
+    def dm(d: date) -> str:
+        return f"{d.day:02d} {d:%b}"
+
+    pdf = _Pdf(f"Demo current account statement {start:%B %Y}")
+    pdf.new_page()
+    pdf.text(40, 12, DISCLAIMER, size=7)
+    pdf.text(295, 23, f"Statement date {dm(end)} {end.year}", size=B_SIZE)
+    pdf.text(295, 35, f"Last statement {dm(start - timedelta(days=1))} {(start - timedelta(days=1)).year}", size=B_SIZE)
+    pdf.text(434, 23, "Barclays Bank", size=13, bold=True)
+    pdf.text(434, 41, "Account", size=13, bold=True)
+    pdf.text(434, 73, f"{dm(start)} - {dm(end)} {end.year}", size=B_SIZE)
+    pdf.text(434, 90, acct.holder, size=B_SIZE)
+    for k, line in enumerate([f"Sort Code {acct.sort_code}", f"Account no. {acct.number}", "SWIFTBIC DEMOGB00",
+                              f"IBAN GB00 DEMO {acct.sort_code.replace('-', '')} {acct.number}"]):
+        pdf.text(434, 106 + 10 * k, "\u2022", size=B_SIZE)
+        pdf.text(441, 106 + 10 * k, line, size=B_SIZE)
+    for k, line in enumerate([acct.holder.upper(), *[a.upper() for a in ADDRESS]]):
+        pdf.text(71, 151 + 9 * k, line, size=B_SIZE)
+    pdf.text(438, 158, "At a glance", size=10, bold=True)
+    for k, (label, value) in enumerate((("Start balance", opening), ("Money in", money_in), ("Money out", money_out),
+                                        ("End balance", closing))):
+        yy = 177 + 15 * k
+        pdf.text(438, yy, label, size=B_SIZE)
+        pdf.text(561, yy, ("-" if value < 0 else "") + _pounds(value), size=B_SIZE, right=True)
+    pdf.text(57, 257, "Your Barclays Bank Account statement", size=15, bold=True)
+    pdf.text(57, 291, "Current account statement", size=10)
+    pdf.text(434, 263, "Your deposit is eligible for protection by the", size=7)
+    pdf.text(434, 273, "Financial Services Compensation Scheme.", size=7)
+    pdf.text(61, 335, "Your transactions", size=12, bold=True)
+    pdf.text(74, 358, "Bank Giro    Cash machine    Contactless    Debit Card    Direct Debit    Online", size=7)
+    _barclays_header(pdf, 391)
+    pdf.text(B_DATE, 408, dm(start), size=B_SIZE)
+    pdf.text(B_DESC_BAL, 408, "Start balance", size=B_SIZE)
+    pdf.text(B_BAL, 408, _signed_money(opening), size=B_SIZE, right=True)
+
+    yy = 428
+    page_no = 1
+    balance = opening
+    for i, t in enumerate(txns):
+        lines = _barclays_lines(t)
+        if yy + B_ROW * len(lines) > B_BOTTOM:
+            _barclays_footer(pdf, page_no, continued=True)
+            pdf.new_page()
+            page_no += 1
+            yy = _barclays_page_top(pdf, acct, page_no)
+        balance += t.pence
+        first_of_day = i == 0 or txns[i - 1].day != t.day
+        last_of_day = i == len(txns) - 1 or txns[i + 1].day != t.day
+        if first_of_day:
+            pdf.text(B_DATE, yy, dm(t.day), size=B_SIZE)
+        for j, line in enumerate(lines):
+            pdf.text(B_DESC, yy, line, size=B_SIZE)
+            if j == 0:
+                pdf.text(B_OUT if t.pence < 0 else B_IN, yy, _money(t.pence), size=B_SIZE, right=True)
+                if last_of_day:
+                    pdf.text(B_BAL, yy, _signed_money(balance), size=B_SIZE, right=True)
+            yy += B_ROW
+        yy += 7  # the gap Barclays leaves between transactions
+    if yy + B_ROW > B_BOTTOM:
+        _barclays_footer(pdf, page_no, continued=True)
+        pdf.new_page()
+        page_no += 1
+        yy = _barclays_page_top(pdf, acct, page_no)
+    pdf.text(B_DATE, yy, dm(end), size=B_SIZE)
+    pdf.text(B_DESC_BAL, yy, "End balance", size=B_SIZE)
+    pdf.text(B_BAL, yy, _signed_money(closing), size=B_SIZE, right=True)
+    pdf.text(57, yy + 30, "Anything Wrong? If you've spotted any incorrect or unusual transactions, get in touch.", size=7)
+    pdf.text(57, yy + 60, "This account does not pay credit interest", size=B_SIZE)
+    _barclays_footer(pdf, page_no, continued=False)
+    pdf.new_page()
+    page_no += 1
+    pdf.text(57, 60, "Important information about compensation arrangements", size=12, bold=True)
+    pdf.text(57, 80, "Fictional information page: a real statement carries several pages of terms here.", size=B_SIZE)
+    _barclays_footer(pdf, page_no, continued=False)
+    pdf.save(path)
+    return path
+
+
 def write_all(hh: Household, root: Path) -> list[Path]:
     """Every statement file under root/<person>/<account>/. Returns the paths written, in a stable order."""
     out: list[Path] = []
@@ -426,6 +582,9 @@ def write_all(hh: Household, root: Path) -> list[Path]:
         elif acct.fmt == "amex_pdf":
             for y, m in hh.months:
                 out.append(write_amex(acct, y, m, folder / f"amex-{acct.owner}-{y}-{m:02d}.pdf"))
+        elif acct.fmt == "barclays_pdf":
+            for y, m in hh.months:
+                out.append(write_barclays(acct, y, m, folder / f"barclays-{acct.owner}-{y}-{m:02d}.pdf"))
         elif acct.fmt == "monzo_pdf":
             out.append(write_monzo_pdf(acct, hh, folder / f"monzo-{acct.owner}-{hh.start:%Y-%m}-to-{hh.end:%Y-%m}.pdf"))
         elif acct.fmt == "monzo_csv":

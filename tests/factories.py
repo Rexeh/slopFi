@@ -22,6 +22,9 @@ JOINT_SORT_CODE, JOINT_NUMBER = "99-10-20", "12341020"
 JOINT_ID = f"{JOINT_SORT_CODE} {JOINT_NUMBER}"          # how the HSBC parser reports an account
 JOINT_HOLDER = "MR A RIVERA & MS S RIVERA"
 MONZO_ID = "99-30-40 12343040"
+BARCLAYS_SORT_CODE, BARCLAYS_NUMBER = "99-50-60", "12345060"
+BARCLAYS_ID = f"{BARCLAYS_SORT_CODE} {BARCLAYS_NUMBER}"
+BARCLAYS_HOLDER = "Mr Alex Rivera"                      # Barclays prints the holder in title case
 CARD_ID = "…00000"                                      # an Amex membership number as the parser reports it
 EMPLOYER = "ACME ANALYTICS LTD"
 SALARY = f"{EMPLOYER} / SALARY"
@@ -132,10 +135,12 @@ def write_demo_statements(root: Path, seed: int = DEMO_SEED, reference: date = D
 def demo_account(key: str = "test", fmt: str = "hsbc_pdf", opening: float = 0.0,
                  txns: list[tuple[date, float, list[str], str]] = ()) -> demo_household.Account:
     """A one-off fictional account for the demo writers: txns are (day, pounds, printed lines, type code)."""
+    holder, sort_code, number = {
+        "amex_pdf": ("ALEX RIVERA", "", "xxxx-xxxxxx-00000"),
+        "barclays_pdf": (BARCLAYS_HOLDER, BARCLAYS_SORT_CODE, BARCLAYS_NUMBER),
+    }.get(fmt, (JOINT_HOLDER, JOINT_SORT_CODE, JOINT_NUMBER))
     acct = demo_household.Account(
         key, "Test account", "alex", "credit_card" if fmt == "amex_pdf" else "current", fmt, f"alex/{key}",
-        "ALEX RIVERA" if fmt == "amex_pdf" else JOINT_HOLDER,
-        "" if fmt == "amex_pdf" else JOINT_SORT_CODE, "xxxx-xxxxxx-00000" if fmt == "amex_pdf" else JOINT_NUMBER,
-        int(round(opening * 100)))
+        holder, sort_code, number, int(round(opening * 100)))
     acct.txns = [demo_household.Txn(d, int(round(pounds * 100)), list(lines), code) for d, pounds, lines, code in txns]
     return acct

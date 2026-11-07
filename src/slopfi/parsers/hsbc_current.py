@@ -5,8 +5,8 @@ whitespace, so multi-line descriptions and right-aligned amounts are unambiguous
 
 Layout facts (A4, points):
   date column   x0 <  100   e.g. "25 Jun 26" - only on the first row of each day
-  type column   105-135     CR DR DD SO VIS ))) ATM BP ...
-  details       135-340     1..5 lines per transaction
+  type column   105-135     CR DR DD SO VIS ))) ATM BP ... (left edge under the "Payment" heading)
+  details       ~131-340    1..5 lines per transaction; indent varies, so the boundary comes from the header
   amounts       x0 >= 340   right-aligned under "Paid out" / "Paid in" / "Balance";
                             balance only on the last row of each day; "D" suffix = overdrawn
 """
@@ -31,6 +31,7 @@ SORT_CODE_RE = re.compile(r"^\d{2}-\d{2}-\d{2}$")
 ACCOUNT_NO_RE = re.compile(r"^\d{8}$")
 KNOWN_TYPES = {"CR", "DR", "DD", "SO", "VIS", ")))", "ATM", "BP", "TFR", "CHQ", "CHG", "SOL", "OTR"}
 ROW_TOLERANCE = 3.0
+TYPE_INDENT = 15.0  # type codes start under the "Payment" heading; details are indented further (21-35pt)
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,9 @@ def _find_header(rows: list[Row]) -> tuple[int, Columns] | None:
         texts = [w.text for w in row.words]
         if texts and texts[0] == "Date" and row.words[0].x0 < 80 and "Balance" in texts:
             cols = Columns()
+            type_head = next((w for w in row.words[1:] if w.x0 >= cols.date_max), None)
+            if type_head is not None:
+                cols.type_max = type_head.x0 + TYPE_INDENT
             for j, w in enumerate(row.words):
                 prev = row.words[j - 1].text if j else ""
                 if w.text == "out" and prev == "Paid":
@@ -143,8 +147,18 @@ def _summary(rows: list[Row]) -> dict[str, float | None]:
         texts = [w.text for w in row.words]
         for key, name in labels.items():
             if tuple(texts[:2]) == key:
+                # rejoin an amount split by kerning ("£126.1" "9"), leaving a touching "D" suffix alone
+                tokens: list[str] = []
+                prev: Word | None = None
+                for w in row.words[2:]:
+                    if (prev is not None and w.x0 - prev.x1 <= 3.0 and w.text.isdigit()
+                            and _money(tokens[-1]) is None):
+                        tokens[-1] += w.text
+                    else:
+                        tokens.append(w.text)
+                    prev = w
                 value = None
-                for tok in texts[2:]:
+                for tok in tokens:
                     v = _money(tok)
                     if v is not None:
                         value = v

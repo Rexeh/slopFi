@@ -6,7 +6,7 @@ import pytest
 
 from slopfi.demo import writers
 from slopfi.parsers import ParsedStatement, ParseError, detect_parser
-from slopfi.parsers.hsbc_current import Columns, Row, Word, _State, _parse_period, parse, sniff
+from slopfi.parsers.hsbc_current import Columns, Row, Word, _State, _find_header, _parse_period, _summary, parse, sniff
 
 import factories
 
@@ -72,6 +72,34 @@ def test_overdrawn_balance_and_reconcile_failure():
     s2.feed(_row(10, (53, 61, "01"), (63, 74, "Jul"), (76, 84, "26"), (113, 125, "DD"), (140, 160, "WATER"), (367, 389, "15.00")), cols, 1)
     with pytest.raises(ParseError):
         s2.finish()
+
+
+def test_a_narrow_layout_takes_the_details_column_from_the_header():
+    # Some statements indent details only ~21pt past the "Payment" heading, left of the default type boundary.
+    header = _row(5, (50, 66, "Date"), (110, 129, "Paym"), (130, 141, "ent"), (144, 159, "type"), (162, 175, "and"),
+                  (178, 201, "details"), (336, 351, "Paid"), (354, 365, "out"), (419, 434, "Paid"), (437, 443, "in"),
+                  (490, 517, "Balance"))
+    _i, cols = _find_header([header])
+    st = _stmt(opening_balance=100.0, closing_balance=130.0, payments_in=50.0, payments_out=20.0)
+    s = _State(st)
+    for row in [
+        _row(10, (50, 58, "25"), (60, 70, "Jul"), (72, 79, "26"), (132, 168, "BALANCE"), (170, 208, "BROUGHT"), (210, 249, "FORWARD"), (499, 519, "100.00")),
+        _row(20, (50, 58, "27"), (60, 68, "Jul"), (70, 78, "26"), (106, 116, "CR"), (132, 153, "Sam"), (155, 180, "Rivera")),
+        _row(30, (132, 172, "JointBills"), (417, 444, "50.00")),
+        _row(40, (106, 119, "VIS"), (132, 162, "TESCO"), (164, 196, "STORES")),
+        _row(50, (132, 192, "EXAMPLETOWN"), (350, 367, "20.00"), (499, 519, "130.00")),
+    ]:
+        s.feed(row, cols, 1)
+    s.finish()
+    assert [(t.type_code, t.lines, t.amount) for t in st.transactions] == [
+        ("CR", ["Sam Rivera", "JointBills"], 50.0), ("VIS", ["TESCO STORES", "EXAMPLETOWN"], -20.0)]
+    assert st.warnings == []
+
+
+def test_summary_rejoins_an_amount_split_by_kerning():
+    rows = [_row(10, (339, 371, "Opening"), (374, 403, "Balance"), (488, 512, "£150.2"), (514, 518, "5")),
+            _row(20, (339, 367, "Closing"), (369, 398, "Balance"), (487, 515, "£40.00"), (521, 526, "D"))]
+    assert _summary(rows) == {"opening_balance": 150.25, "payments_in": None, "payments_out": None, "closing_balance": -40.0}
 
 
 # ----------------------------------------------------------- generated PDFs

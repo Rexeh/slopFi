@@ -60,6 +60,8 @@ def _account_rows(conn: sqlite3.Connection) -> list[dict]:
         d["range"] = f"{date_label(a['first_date'])} to {date_label(a['last_date'])}" if a["first_date"] else ""
         d["n_statements"] = conn.execute("SELECT COUNT(*) FROM statements WHERE account_id = ?", (a["id"],)).fetchone()[0]
         out.append(d)
+    for d in out:
+        d["merge_targets"] = [o for o in out if o["id"] != d["id"] and (o["kind"], o["institution"]) == (d["kind"], d["institution"])]
     return out
 
 
@@ -135,6 +137,15 @@ def delete_account(conn: Conn, account_id: int):
     if not importer.delete_account(conn, account_id):
         return redirect("/statements#accounts", f"{row['name']} still has statements, so it was not deleted", kind="error")
     return redirect("/statements#accounts", f"{row['name']} deleted")
+
+
+@router.post("/accounts/{account_id}/merge")
+def merge_account(conn: Conn, account_id: int, into_id: int = Form(...)):
+    try:
+        old, new = importer.merge_accounts(conn, account_id, into_id)
+    except ValueError as exc:
+        return redirect("/statements#accounts", f"Not merged: {exc}", kind="error")
+    return redirect("/statements#accounts", f"{old} merged into {new}")
 
 
 @router.post("/accounts/{account_id}")

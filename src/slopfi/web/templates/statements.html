@@ -122,6 +122,12 @@
       <td class="actions">
         <button type="submit" form="acct-form-{{ a.id }}" class="btn btn-sm">Save</button>
         <button type="button" class="btn-quiet" data-cancel="acct-{{ a.id }}">Cancel</button>
+        {% if a.merge_targets %}
+        <form method="post" action="/accounts/{{ a.id }}/merge" class="inline" data-confirm="Merge {{ a.name }}?" data-confirm-detail="Its statements, transactions and balances move to the account you chose, and {{ a.name }} is removed. This can't be undone." data-confirm-label="Merge">
+          <select name="into_id" required aria-label="Merge {{ a.name }} into"><option value="">Merge into…</option>{% for t in a.merge_targets %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+          <button class="btn-quiet">Merge</button>
+        </form>
+        {% endif %}
       </td>
     </tr>
     {% else %}
@@ -131,7 +137,7 @@
   </table>
   </div>
   {% for a in accounts %}<form id="acct-form-{{ a.id }}" method="post" action="/accounts/{{ a.id }}"></form>{% endfor %}
-  <p class="panel-note">Edit a name, owner or type and choose Save. An account can be deleted only once it has no statements.</p>
+  <p class="panel-note">Edit a name, owner or type and choose Save. An account can be deleted only once it has no statements. If a bank renamed an account and it now appears twice, choose Edit on the old one and merge it into the new one.</p>
 </section>
 </div>
 {% endblock %}

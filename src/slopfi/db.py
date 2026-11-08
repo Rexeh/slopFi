@@ -197,10 +197,26 @@ def default_db_path() -> Path:
     return Path(os.environ.get("SLOPFI_DB", "slopfi.db"))
 
 
+class Connection(sqlite3.Connection):
+    """Makes `with conn:` one real transaction: in autocommit mode sqlite3 would never open one. A nested block joins
+    the outer one, so only the outermost commits or rolls back."""
+    _depth = 0
+
+    def __enter__(self):
+        if not self._depth:
+            self.execute("BEGIN IMMEDIATE")   # take the write lock up front: upgrading from a read can fail at once with SQLITE_BUSY
+        self._depth += 1
+        return self
+
+    def __exit__(self, *exc):
+        self._depth -= 1
+        return False if self._depth else super().__exit__(*exc)
+
+
 def connect(path: str | os.PathLike | None = None) -> sqlite3.Connection:
     """Open (and initialise if needed) the database. Use ':memory:' for tests."""
     target = ":memory:" if path == ":memory:" else str(path or default_db_path())
-    conn = sqlite3.connect(target, detect_types=0, isolation_level=None, check_same_thread=False)
+    conn = sqlite3.connect(target, detect_types=0, isolation_level=None, check_same_thread=False, factory=Connection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL") if target != ":memory:" else None

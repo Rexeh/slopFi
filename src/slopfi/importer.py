@@ -179,6 +179,11 @@ def import_file(
             results.append(import_statement(conn, stmt, label, section_hash, account_id=target))
         except ValueError as exc:
             results.append(ImportResult(source=label, status="error", message=str(exc)))
+        except sqlite3.IntegrityError as exc:
+            if "file_sha256" not in str(exc):
+                raise
+            # another request imported this file after the duplicate check above
+            results.append(ImportResult(source=label, status="duplicate", message="already imported (identical file)"))
     return results
 
 
@@ -206,3 +211,31 @@ def delete_account(conn: sqlite3.Connection, account_id: int) -> bool:
     with conn:
         conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
     return True
+
+
+def merge_accounts(conn: sqlite3.Connection, from_id: int, into_id: int) -> tuple[str, str]:
+    """Move everything on `from_id` to `into_id` and delete it, for an account the bank renamed (a Monzo pot's identity
+    is its name). `into_id` keeps its name, owner and identifier, so its future statements still match. Returns both
+    names; raises ValueError if the merge would be wrong."""
+    old = conn.execute("SELECT * FROM accounts WHERE id = ?", (from_id,)).fetchone()
+    new = conn.execute("SELECT * FROM accounts WHERE id = ?", (into_id,)).fetchone()
+    if old is None or new is None or from_id == into_id:
+        raise ValueError("choose two different accounts")
+    if (old["kind"], old["institution"]) != (new["kind"], new["institution"]):
+        raise ValueError(f"{old['name']} and {new['name']} are not the same kind of account at the same bank")
+    # Fingerprints include the bank identifier, so a transaction on both accounts would not be seen as a duplicate.
+    clash = conn.execute(
+        """SELECT a.source_name AS a, b.source_name AS b FROM statements a
+           JOIN statements b ON a.period_start <= b.period_end AND b.period_start <= a.period_end
+           WHERE a.account_id = ? AND b.account_id = ? LIMIT 1""", (from_id, into_id)).fetchone()
+    if clash:
+        raise ValueError(f"{clash['a']} and {clash['b']} cover the same dates: delete one of them first")
+    with conn:
+        conn.execute("UPDATE statements SET account_id = ? WHERE account_id = ?", (into_id, from_id))
+        conn.execute("UPDATE transactions SET account_id = ? WHERE account_id = ?", (into_id, from_id))
+        conn.execute("UPDATE OR IGNORE balance_snapshots SET account_id = ? WHERE account_id = ?", (into_id, from_id))
+        conn.execute("UPDATE OR IGNORE scenario_items SET ref_id = ? WHERE ref_type = 'account' AND ref_id = ?", (into_id, from_id))
+        conn.execute("DELETE FROM scenario_items WHERE ref_type = 'account' AND ref_id = ?", (from_id,))   # no foreign key
+        conn.execute("UPDATE scenarios SET surplus_target = ? WHERE surplus_target = ?", (f"account:{into_id}", f"account:{from_id}"))
+        conn.execute("DELETE FROM accounts WHERE id = ?", (from_id,))
+    return old["name"], new["name"]

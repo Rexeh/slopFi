@@ -66,18 +66,20 @@ def _summary(rows) -> tuple[float, float, float, float]:
     for i, (_y, words) in enumerate(rows):
         texts = [w[2] for w in words]
         if texts[:3] == ["Previous", "Closing", "Balance"] and i + 1 < len(rows):
-            values: list[float] = []
-            tokens = [w[2] for w in rows[i + 1][1]]
-            for j, tok in enumerate(tokens):
-                v = _money(tok)
-                if v is None:
-                    continue
-                if j + 1 < len(tokens) and tokens[j + 1] == "CR":
-                    v = -v
-                values.append(v)
+            words = rows[i + 1][1]
+            amounts = [[w[0], v] for w in words if (v := _money(w[2])) is not None]
+            # "CR" follows its amount on the same row, or sits just below it on a row of its own
+            crs = [w for w in words if w[2] == "CR"]
+            if i + 2 < len(rows) and all(w[2] == "CR" for w in rows[i + 2][1]):
+                crs += rows[i + 2][1]
+            for x0, _x1, _cr in crs:
+                owner = max((a for a in amounts if a[0] <= x0), key=lambda a: a[0], default=None)
+                if owner is not None:
+                    owner[1] = -owner[1]
+            values = [v for _x, v in amounts]
             if len(values) == 4:
                 return values[0], values[1], values[2], values[3]
-            raise ParseError(f"could not read account summary: {tokens}")
+            raise ParseError(f"could not read account summary: {[w[2] for w in words]}")
     raise ParseError("account summary not found")
 
 

@@ -6,7 +6,7 @@ import pytest
 
 from slopfi.demo import writers
 from slopfi.parsers import detect_parser
-from slopfi.parsers.amex_card import _money, _parse_period, _txn_date, parse
+from slopfi.parsers.amex_card import _money, _parse_period, _summary, _txn_date, parse
 
 import factories
 
@@ -18,6 +18,17 @@ def test_helpers():
     assert _txn_date("Dec", "20", s, e) == date(2026, 12, 20)
     assert _txn_date("Jan", "3", s, e) == date(2027, 1, 3)
     assert _money(".65") == 0.65 and _money("1,234.56") == 1234.56 and _money("CR") is None and _money("12,34") == 12.34
+
+
+def test_summary_reads_a_cr_printed_on_the_row_below():
+    # Real statements set "CR" a few points below the amount, so it groups as its own row.
+    labels = [(65, 89, "Previous"), (91, 111, "Closing"), (112, 134, "Balance"), (379, 399, "Closing"), (401, 423, "Balance")]
+    values = [(86, 135, "£1,200.00"), (143, 147, "-"), (185, 231, "£1,500.00"), (237, 243, "+"),
+              (288, 327, "£250.00"), (333, 339, "="), (375, 381, "£"), (381, 415, "50.00")]
+    rows = [(195.0, labels), (210.0, values), (213.2, [(414, 423, "CR")]), (244.7, [(152, 176, "Direct")])]
+    assert _summary(rows) == (1200.0, 1500.0, 250.0, -50.0)
+    rows[2] = (213.2, [(130, 139, "CR")])                 # under the previous balance instead
+    assert _summary(rows) == (-1200.0, 1500.0, 250.0, 50.0)
 
 
 @pytest.fixture(scope="module")

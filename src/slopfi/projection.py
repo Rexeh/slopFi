@@ -7,7 +7,7 @@ import statistics
 from dataclasses import dataclass, field
 from datetime import date
 
-from . import reports
+from . import clock, reports
 from .db import get_setting, now_iso, set_setting
 
 # Settings keys with their defaults (annual %, except horizon). Editable on the Settings page.
@@ -456,7 +456,7 @@ def build_inputs(conn: sqlite3.Connection, scenario_id: int, start: date | None 
             items.append(target)
         target.contribution += levers["extra_monthly"]
     inp = Inputs(
-        items=items, start=start or date.today().replace(day=1),
+        items=items, start=start or clock.today().replace(day=1),
         horizon_years=int(sc["horizon_years"] or setting(conn, "proj.horizon_years")),
         inflation_pct=sc["inflation_pct"] if sc["inflation_pct"] is not None else setting(conn, "proj.inflation"),
         property_growth_pct=sc["property_growth_pct"] if sc["property_growth_pct"] is not None else setting(conn, "proj.rate.property"),

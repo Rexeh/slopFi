@@ -2,7 +2,7 @@
 import pytest
 from playwright.sync_api import expect
 
-PAGES = {"/": "Overview", "/review": "Review", "/transactions": "Transactions", "/spending": "Spending",
+PAGES = {"/": "Overview", "/review": "Review", "/transactions": "Transactions", "/renewals": "Renewals", "/spending": "Spending",
          "/networth": "Net worth", "/projection": "Projection", "/statements": "Accounts and statements",
          "/categories": "Categories and rules", "/settings": "Settings"}
 

@@ -44,7 +44,7 @@ def test_checklist_steps_for_latest_open_month(conn):
     today = date(2026, 8, 3)
     assert review.latest_open_month(conn, today) == "2026-07"      # newest complete calendar month with data
     c = review.checklist(conn, today=today)
-    assert c["month"] == "2026-07" and [s["key"] for s in c["steps"]] == ["statements", "categorise", "one_offs", "balances", "targets"]
+    assert c["month"] == "2026-07" and [s["key"] for s in c["steps"]] == ["statements", "categorise", "one_offs", "balances", "targets", "renewals"]
     june = review.checklist(conn, "2026-06", today=today)
     cat = next(s for s in june["steps"] if s["key"] == "categorise")
     assert cat["done"] is False and cat["count"] == "2 left" and cat["href"] == "/transactions?month=2026-06&uncategorised=1"
@@ -53,7 +53,7 @@ def test_checklist_steps_for_latest_open_month(conn):
     stale = review.checklist(conn, "2026-06", today=date(2026, 12, 1))
     assert next(s for s in stale["steps"] if s["key"] == "balances")["count"] == "1 stale"
     assert next(s for s in june["steps"] if s["key"] == "targets")["count"] == "none set"
-    assert c["uncategorised_total"] == 2 and june["left"] == 5 - june["done"]
+    assert c["uncategorised_total"] == 2 and june["left"] == 6 - june["done"]
 
 
 def test_close_and_reopen_month(conn):

@@ -181,6 +181,48 @@ CREATE TABLE IF NOT EXISTS accepted_gaps (
     accepted_at TEXT NOT NULL,
     PRIMARY KEY (month, account_id)
 );
+
+CREATE TABLE IF NOT EXISTS renewals (
+    id           INTEGER PRIMARY KEY,
+    name         TEXT NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('insurance', 'energy', 'broadband', 'mobile', 'car', 'mortgage', 'other')),
+    provider     TEXT,
+    owner        TEXT NOT NULL DEFAULT 'joint',
+    ends_on      TEXT,                     -- ISO date; for a mortgage row, copied from the holding's fix_end
+    lead_days    INTEGER,                  -- NULL: the kind's default
+    price        REAL,
+    price_period TEXT NOT NULL DEFAULT 'month' CHECK (price_period IN ('month', 'year', 'once')),
+    payee_key    TEXT,                     -- reports.recurring() merchant key the renewal's payments group under
+    holding_id   INTEGER UNIQUE REFERENCES holdings(id) ON DELETE SET NULL,   -- the mortgage this row mirrors
+    notes        TEXT,
+    archived_at  TEXT,                     -- a mortgage row whose holding was deleted or lost its fix end
+    created_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS renewal_events (
+    id             INTEGER PRIMARY KEY,
+    renewal_id     INTEGER NOT NULL REFERENCES renewals(id) ON DELETE CASCADE,
+    recorded_on    TEXT NOT NULL,
+    outcome        TEXT NOT NULL CHECK (outcome IN ('stayed', 'switched', 'haggled', 'done')),
+    old_provider   TEXT, old_price REAL, old_period TEXT, old_ends_on TEXT,
+    old_rate       REAL,                   -- mortgage only: what an undo puts back on the holding
+    quote          REAL, quote_period TEXT,
+    other_quote    REAL, other_period TEXT, other_provider TEXT,
+    new_provider   TEXT, new_price REAL, new_period TEXT, new_ends_on TEXT,
+    new_rate       REAL, new_payment REAL  -- mortgage only
+);
+
+CREATE TABLE IF NOT EXISTS deferred_renewals (
+    month       TEXT NOT NULL,             -- 'YYYY-MM': the checklist month it was put off for
+    renewal_id  INTEGER NOT NULL REFERENCES renewals(id) ON DELETE CASCADE,
+    deferred_at TEXT NOT NULL,
+    PRIMARY KEY (month, renewal_id)
+);
+
+CREATE TABLE IF NOT EXISTS dismissed_renewal_suggestions (
+    payee_key    TEXT PRIMARY KEY,
+    dismissed_at TEXT NOT NULL
+);
 """
 
 # Applied in order to databases created at an earlier SCHEMA_VERSION. New tables come from SCHEMA.
@@ -204,6 +246,7 @@ MIGRATIONS: dict[int, list] = {
     7: [],   # closed_months: new table only
     8: [],   # accepted_spikes, accepted_gaps: new tables only
     9: [_add_column("categories", "spread", "INTEGER NOT NULL DEFAULT 0")],
+    10: [],  # renewals, renewal_events, deferred_renewals, dismissed_renewal_suggestions: new tables only
 }
 
 
@@ -242,7 +285,7 @@ def connect(path: str | os.PathLike | None = None) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 def init_db(conn: sqlite3.Connection) -> None:

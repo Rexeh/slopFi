@@ -1,0 +1,405 @@
+<title>Renewals Mockups</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a stack of annotated screens, each a framed slice of slopFi in its own look; notes sit beside on wide screens, below on narrow. Tokens follow slopFi's style.css. */
+:root {
+  --page: #f1ede6; --sidebar: #e9e4db; --surface: #fffefc; --tint: #f6f3ee; --border: #e5e0d7; --border-strong: #82817c;
+  --ink: #23201b; --ink-2: #58534b; --ink-3: #6a655b;
+  --accent: #136f73; --accent-ink: #ffffff; --accent-tint: #e3f0ef;
+  --pos: #177244; --pos-tint: #e4f3ea; --neg: #b3261e; --neg-tint: #fbe9e7; --warn: #8a5a00; --warn-tint: #fbf1d6;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --shadow-1: 0 1px 2px rgb(52 40 20 / .08), 0 1px 1px rgb(52 40 20 / .04);
+  --shadow-3: 0 8px 24px rgb(52 40 20 / .10);
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #161411; --sidebar: #1b1916; --surface: #221f1b; --tint: #292520; --border: #37322c; --border-strong: #7a7970;
+  --ink: #ebe7df; --ink-2: #b6afa4; --ink-3: #9b9489;
+  --accent: #5cc0c6; --accent-ink: #0f1a1b; --accent-tint: #17302f;
+  --pos: #4fc488; --pos-tint: #15311f; --neg: #ef7b74; --neg-tint: #3a1f1d; --warn: #e0b44c; --warn-tint: #2e2611;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .45), 0 0 0 1px rgb(255 255 255 / .03);
+  --shadow-3: 0 8px 24px rgb(0 0 0 / .5);
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --page: #161411; --sidebar: #1b1916; --surface: #221f1b; --tint: #292520; --border: #37322c; --border-strong: #7a7970;
+  --ink: #ebe7df; --ink-2: #b6afa4; --ink-3: #9b9489;
+  --accent: #5cc0c6; --accent-ink: #0f1a1b; --accent-tint: #17302f;
+  --pos: #4fc488; --pos-tint: #15311f; --neg: #ef7b74; --neg-tint: #3a1f1d; --warn: #e0b44c; --warn-tint: #2e2611;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .45), 0 0 0 1px rgb(255 255 255 / .03);
+  --shadow-3: 0 8px 24px rgb(0 0 0 / .5);
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+::selection { background: var(--accent-tint); color: var(--ink); }
+body { background: var(--tint); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 36px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 56px; }
+h1, h2, h3, h4 { margin: 0; text-wrap: balance; line-height: 1.25; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); text-decoration: none; font-weight: 500; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+.intro { display: grid; gap: 10px; max-width: 70ch; }
+.intro h1 { font-size: 28px; }
+.intro p { color: var(--ink-2); font-size: 15px; }
+.fiction { font-size: 12px; color: var(--ink-3); }
+
+/* one mockup = screen + notes */
+.mock { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 28px; align-items: start; }
+@media (max-width: 960px) { .mock { grid-template-columns: minmax(0, 1fr); } }
+.mock-title { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.mock-title h2 { font-size: 20px; }
+.option { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-tint); padding: 2px 10px; border-radius: 99px; }
+.notes { display: grid; gap: 12px; font-size: 13px; color: var(--ink-2); }
+.notes h3 { font-size: 13px; color: var(--ink); }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+.notes b { color: var(--ink); font-weight: 600; }
+
+/* the app frame */
+.screen { background: var(--page); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-3); overflow: hidden; display: grid; grid-template-columns: 196px minmax(0, 1fr); min-width: 0; }
+@media (max-width: 720px) { .screen { grid-template-columns: minmax(0, 1fr); } .side { display: none; } }
+.side { background: var(--sidebar); padding: 16px 10px; display: grid; align-content: start; gap: 2px; font-size: 13px; }
+.brand { font-weight: 600; font-size: 18px; letter-spacing: -.01em; padding: 0 8px 2px; color: var(--ink); }
+.house { font-size: 11px; color: var(--ink-3); padding: 0 8px 12px; }
+.grp { font-size: 11px; font-weight: 600; color: var(--ink-2); padding: 10px 8px 4px; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 5px; color: var(--ink-2); font-weight: 500; }
+.nav svg { width: 15px; height: 15px; flex: none; }
+.nav .n { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--warn); }
+.nav.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+.nav.new { outline: 1.5px dashed var(--accent); outline-offset: -1px; }
+.main { padding: 22px 24px 26px; display: grid; gap: 16px; min-width: 0; align-content: start; }
+@media (max-width: 720px) { .main { padding: 16px; } }
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.head h3 { font-size: 21px; }
+.sub { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+.sub b { color: var(--ink); }
+.panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.panel-head h4 { font-size: 15px; }
+.muted { color: var(--ink-3); font-size: 12px; }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 500; border-radius: 5px; padding: 6px 12px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; white-space: nowrap; }
+.btn svg { width: 14px; height: 14px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.quiet { border-color: transparent; background: transparent; color: var(--accent); padding-inline: 4px; }
+.btn:hover { border-color: var(--border-strong); }
+.btn.primary:hover { filter: brightness(1.08); }
+
+/* checklist */
+.steps { display: grid; }
+.step { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.step:last-child { border-bottom: 0; }
+.si { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; }
+.si svg { width: 15px; height: 15px; }
+.si.done { background: var(--pos-tint); color: var(--pos); }
+.si.todo { background: var(--warn-tint); color: var(--warn); }
+.step b { font-weight: 600; font-size: 14px; }
+.step p { color: var(--ink-2); font-size: 13px; }
+.step .act { font-size: 13px; display: inline-flex; align-items: center; gap: 2px; padding-top: 3px; white-space: nowrap; }
+.step .act svg { width: 14px; height: 14px; }
+.step.new { background: linear-gradient(var(--accent-tint), var(--accent-tint)) padding-box; margin-inline: -10px; padding-inline: 10px; border-radius: 5px; border-bottom-color: transparent; }
+.sublist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.sublist li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px; }
+.sublist .when { color: var(--ink-3); font-size: 12px; }
+
+/* register */
+.summary { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 13px; color: var(--ink-2); }
+.summary b { color: var(--ink); font-size: 18px; font-weight: 600; display: block; line-height: 1.2; }
+.summary .good b { color: var(--pos); }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-2); padding: 6px 8px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+td { padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+.num { text-align: right; white-space: nowrap; }
+.name { font-weight: 500; }
+.meta { display: block; color: var(--ink-3); font-size: 12px; font-weight: 400; }
+.group-row td { background: var(--tint); font-size: 12px; font-weight: 600; color: var(--ink-2); padding-block: 5px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; white-space: nowrap; }
+.pill.now { color: var(--warn); background: var(--warn-tint); }
+.pill.soon { color: var(--ink-2); background: var(--tint); border: 1px solid var(--border); }
+.pill.src { color: var(--accent); background: var(--accent-tint); }
+.pill.up { color: var(--neg); background: var(--neg-tint); }
+.pill.saved { color: var(--pos); background: var(--pos-tint); }
+.tip { font-size: 12px; color: var(--ink-3); margin-top: 2px; display: block; }
+
+/* tabs (option B) */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab { padding: 8px 12px; font-size: 13px; font-weight: 500; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+.tab.new { color: var(--accent); }
+
+/* renew form */
+.expanded td { background: var(--tint); }
+.renew { display: grid; gap: 14px; padding: 6px 4px 8px; }
+.renew-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.input { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 5px; padding: 6px 9px; min-height: 32px; display: flex; align-items: center; gap: 4px; }
+.input .unit { color: var(--ink-3); margin-left: auto; font-size: 12px; }
+.choice { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 5px; overflow: hidden; }
+.choice span { padding: 6px 12px; font-size: 13px; }
+.choice .sel { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.result { font-size: 13px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.result b { color: var(--pos); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.history { display: grid; gap: 6px; }
+.history h5 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.history table td, .history table th { padding: 5px 8px; }
+
+/* suggestions */
+.suggest { display: grid; gap: 8px; }
+.sg { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); }
+@media (max-width: 520px) { .sg { grid-template-columns: minmax(0, 1fr) auto; } .sg .amt { display: none; } }
+.sg .amt { color: var(--ink-2); font-size: 13px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.select { justify-content: space-between; }
+.select svg { width: 14px; height: 14px; color: var(--ink-3); }
+
+.decision { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; display: grid; gap: 12px; max-width: 80ch; }
+.decision h2 { font-size: 18px; }
+.decision ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink-2); }
+.decision b { color: var(--ink); }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 13l2 2 4-4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M12 14v3l2 1"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 20V11M12 20V5M18 20v-6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 4l8 4-8 4-8-4 8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6 4 4 6-7M15 8h5v5"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Renewals and contract end dates</h1>
+    <p>The approved design: where renewals show up at month close, the register as its own page, recording a renewal with its prices, and adding one. Everything sits inside slopFi's existing look.</p>
+    <p class="fiction">Example household and providers, as in the demo. Today is 18 November 2026; October is open.</p>
+  </header>
+
+  <!-- 1 · Review step -->
+  <section class="mock" aria-labelledby="m1">
+    <div class="mock-title"><h2 id="m1">Month close gets a sixth step</h2></div>
+    <div class="screen">
+      <nav class="side" aria-label="Mock sidebar">
+        <div class="brand">slopFi</div><div class="house">Household · Alex and Sam</div>
+        <div class="grp">Review</div>
+        <div class="nav on"><svg><use href="#i-review"/></svg>Review<span class="n">3</span></div>
+        <div class="nav"><svg><use href="#i-list"/></svg>Transactions</div>
+        <div class="nav"><svg><use href="#i-cal"/></svg>Renewals<span class="n">3</span></div>
+        <div class="grp">Understand</div>
+        <div class="nav"><svg><use href="#i-grid"/></svg>Overview</div>
+        <div class="nav"><svg><use href="#i-bars"/></svg>Spending</div>
+      </nav>
+      <div class="main">
+        <div class="head"><div><h3>Review · October 2026</h3><p class="sub"><b>October is open.</b> 1 of 6 steps left before it can be closed.</p></div></div>
+        <div class="panel">
+          <div class="panel-head"><h4>Before you close October</h4><span class="muted">5 of 6 done</span></div>
+          <div class="steps">
+            <div class="step"><span class="si done"><svg><use href="#i-check"/></svg></span><div><b>Statements imported</b><p>Every account covers the month.</p></div><a class="act" href="#m1">Import<svg><use href="#i-chev"/></svg></a></div>
+            <div class="step"><span class="si done"><svg><use href="#i-check"/></svg></span><div><b>Categorise</b><p>Everything is filed.</p></div><a class="act" href="#m1">Open<svg><use href="#i-chev"/></svg></a></div>
+            <div class="step"><span class="si done"><svg><use href="#i-check"/></svg></span><div><b>One-offs checked</b><p>No category is far above its usual level.</p></div><a class="act" href="#m1">Check<svg><use href="#i-chev"/></svg></a></div>
+            <div class="step"><span class="si done"><svg><use href="#i-check"/></svg></span><div><b>Update balances</b><p>Every balance is under 30 days old.</p></div><a class="act" href="#m1">Open<svg><use href="#i-chev"/></svg></a></div>
+            <div class="step"><span class="si done"><svg><use href="#i-check"/></svg></span><div><b>Targets checked</b><p>No category is over its target.</p></div><a class="act" href="#m1">Review<svg><use href="#i-chev"/></svg></a></div>
+            <div class="step new"><span class="si todo"><svg><use href="#i-dot"/></svg></span>
+              <div><b>Renewals checked</b><p>3 renewals need a decision before the next close.</p>
+                <ul class="sublist">
+                  <li><span class="name">Car insurance</span><span class="when">ends 2 Dec</span><button class="btn quiet" type="button">Renew</button><button class="btn quiet" type="button">Look at it next close</button></li>
+                  <li><span class="name">Broadband</span><span class="when">minimum term ends 9 Dec</span><button class="btn quiet" type="button">Renew</button><button class="btn quiet" type="button">Look at it next close</button></li>
+                  <li><span class="name">Mortgage fix</span><span class="when">ends 31 Mar 2027 · deals can be booked now</span><button class="btn quiet" type="button">Renew</button><button class="btn quiet" type="button">Look at it next close</button></li>
+                </ul>
+              </div><a class="act" href="#m2">Renewals (3)<svg><use href="#i-chev"/></svg></a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+      <h3>How it behaves</h3>
+      <ul>
+        <li><b>Looks ahead to the next close, not just today.</b> A reminder could otherwise start between two closes and only show up with weeks lost.</li>
+        <li><b>Never blocks closing a month.</b> "Look at it next close" ticks the step for this month only, like accepting a spending spike does.</li>
+        <li>The step is done once every renewal in the window is renewed or put off to next close.</li>
+        <li>The sidebar shows the same count as the step.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 2 · Option A: own page -->
+  <section class="mock" aria-labelledby="m2">
+    <div class="mock-title"><h2 id="m2">The register as its own page</h2><span class="option">Approved: Option A</span></div>
+    <div class="screen">
+      <nav class="side" aria-label="Mock sidebar">
+        <div class="brand">slopFi</div><div class="house">Household · Alex and Sam</div>
+        <div class="grp">Review</div>
+        <div class="nav"><svg><use href="#i-review"/></svg>Review<span class="n">1</span></div>
+        <div class="nav"><svg><use href="#i-list"/></svg>Transactions</div>
+        <div class="nav on new"><svg><use href="#i-cal"/></svg>Renewals<span class="n">3</span></div>
+        <div class="grp">Understand</div>
+        <div class="nav"><svg><use href="#i-grid"/></svg>Overview</div>
+        <div class="nav"><svg><use href="#i-bars"/></svg>Spending</div>
+        <div class="nav"><svg><use href="#i-layers"/></svg>Net worth</div>
+        <div class="nav"><svg><use href="#i-trend"/></svg>Projection</div>
+      </nav>
+      <div class="main">
+        <div class="head">
+          <div><h3>Renewals</h3><p class="sub">Contracts and dates that need a decision before they roll over. <b>3 are due</b> before the next close.</p></div>
+          <button class="btn primary" type="button"><svg><use href="#i-plus"/></svg>Add renewal</button>
+        </div>
+        <div class="panel">
+          <div class="summary">
+            <div><b>£3,214</b>a year across 9 renewals</div>
+            <div class="good"><b>£347</b>saved at renewal in 2026</div>
+            <div><b>2</b>suggested from your payments</div>
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Renewal</th><th>Ends</th><th class="num">Paying now</th><th class="num">Last time</th><th></th></tr></thead>
+            <tbody>
+              <tr class="group-row"><td colspan="5">Due before the next close</td></tr>
+              <tr><td class="name">Car insurance<span class="meta">Northgate · Alex · paid yearly</span></td><td><span class="pill now">in 14 days</span><span class="tip">2 Dec 2026</span></td><td class="num">£612 a year</td><td class="num"><span class="pill saved">saved £77</span></td><td class="num"><a href="#m4">Renew</a></td></tr>
+              <tr><td class="name">Broadband<span class="meta">Brightwire · Joint · direct debit</span></td><td><span class="pill now">in 21 days</span><span class="tip">9 Dec 2026 · minimum term</span></td><td class="num">£58 a month</td><td class="num"><span class="pill up">up 12%</span></td><td class="num"><a href="#m4">Renew</a></td></tr>
+              <tr><td class="name">Mortgage fix <span class="pill src">From Net worth</span><span class="meta">Example Home Loans · Joint · 4.29%</span></td><td><span class="pill now">in 4 months</span><span class="tip">31 Mar 2027 · reminds 6 months ahead</span></td><td class="num">£1,145 a month</td><td class="num">–</td><td class="num"><a href="#m4">Renew</a></td></tr>
+              <tr class="group-row"><td colspan="5">Next six months</td></tr>
+              <tr><td class="name">MOT<span class="meta">Car · no contract</span></td><td><span class="pill soon">in 5 months</span><span class="tip">20 Apr 2027</span></td><td class="num">£54.85</td><td class="num">–</td><td class="num"><a href="#m4">Done</a></td></tr>
+              <tr><td class="name">Energy fixed tariff<span class="meta">Octavia Energy · Joint · direct debit</span></td><td><span class="pill soon">in 6 months</span><span class="tip">10 May 2027</span></td><td class="num">£142 a month</td><td class="num"><span class="pill saved">saved £210</span></td><td class="num"><a href="#m4">Renew</a></td></tr>
+              <tr><td class="name">Home insurance<span class="meta">Hearthside · Joint · direct debit</span></td><td><span class="pill soon">in 6 months</span><span class="tip">14 May 2027</span></td><td class="num">£31 a month</td><td class="num">–</td><td class="num"><a href="#m4">Renew</a></td></tr>
+              <tr class="group-row"><td colspan="5">Later</td></tr>
+              <tr><td class="name">Road tax<span class="meta">Car · direct debit</span></td><td>1 Jun 2027</td><td class="num">£16.54 a month</td><td class="num">–</td><td class="num"><a href="#m4">Done</a></td></tr>
+              <tr><td class="name">Mobile<span class="meta">Sam · SIM only</span></td><td>18 Jul 2027</td><td class="num">£12 a month</td><td class="num"><span class="pill saved">saved £60</span></td><td class="num"><a href="#m4">Renew</a></td></tr>
+              <tr><td class="name">Pet insurance<span class="meta">Joint · direct debit</span></td><td>3 Sep 2027</td><td class="num">£24 a month</td><td class="num">–</td><td class="num"><a href="#m4">Renew</a></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+      <h3>Why its own page</h3>
+      <ul>
+        <li><b>It's a to-do list, not an analysis</b>, so it sits in the Review group next to Transactions.</li>
+        <li><b>The mortgage fix comes from Net worth.</b> You edit it there, and nothing is entered twice.</li>
+        <li><b>"Paying now"</b> uses the latest linked payment from your statements when there is one. Otherwise it's the price you recorded.</li>
+        <li><b>"Last time"</b> shows the outcome of the last renewal: saved, or how much the price went up.</li>
+        <li>MOT and road tax use <b>Done</b> instead of Renew: they have a date and a cost, but no quotes.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 4 · Recording a renewal -->
+  <section class="mock" aria-labelledby="m4">
+    <div class="mock-title"><h2 id="m4">Recording a renewal and its prices</h2></div>
+    <div class="screen">
+      <nav class="side" aria-label="Mock sidebar">
+        <div class="brand">slopFi</div><div class="house">Household · Alex and Sam</div>
+        <div class="grp">Review</div>
+        <div class="nav"><svg><use href="#i-review"/></svg>Review<span class="n">1</span></div>
+        <div class="nav"><svg><use href="#i-list"/></svg>Transactions</div>
+        <div class="nav on"><svg><use href="#i-cal"/></svg>Renewals<span class="n">3</span></div>
+      </nav>
+      <div class="main">
+        <div class="panel">
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Renewal</th><th>Ends</th><th class="num">Paying now</th><th class="num">Last time</th><th></th></tr></thead>
+            <tbody>
+              <tr class="expanded"><td class="name">Car insurance<span class="meta">Northgate · Alex · paid yearly</span></td><td><span class="pill now">in 14 days</span><span class="tip">2 Dec 2026</span></td><td class="num">£612 a year</td><td class="num"><span class="pill saved">saved £77</span></td><td class="num"><button class="btn quiet" type="button">Close</button></td></tr>
+              <tr class="expanded"><td colspan="5">
+                <div class="renew">
+                  <div class="renew-grid">
+                    <label class="field">Renewal quote from Northgate<span class="input">£ 734<span class="unit">a year</span></span></label>
+                    <label class="field">Best other quote <span class="muted">optional</span><span class="input">£ 559<span class="unit">a year</span></span></label>
+                    <label class="field">Other provider<span class="input">Kestrel Direct</span></label>
+                  </div>
+                  <div class="renew-grid">
+                    <div class="field">What did you do?<span class="choice"><span>Stayed</span><span class="sel">Switched</span><span>Haggled</span></span></div>
+                    <label class="field">New price<span class="input">£ 559<span class="unit">a year</span></span></label>
+                    <label class="field">New end date<span class="input">2 Dec 2027</span></label>
+                  </div>
+                  <p class="result"><span class="pill saved">£175 less</span>than Northgate's renewal quote, and <b>£53 less</b> than this year.</p>
+                  <div class="row-actions"><button class="btn primary" type="button">Save renewal</button><button class="btn" type="button">Look at it next close</button><span class="muted">Saving moves Northgate to the history and starts the new term with Kestrel Direct.</span></div>
+                  <div class="history">
+                    <h5>History</h5>
+                    <div class="tbl-wrap"><table>
+                      <thead><tr><th>Term</th><th>Provider</th><th class="num">Renewal quote</th><th class="num">Paid</th><th class="num">Saved</th></tr></thead>
+                      <tbody>
+                        <tr><td>Dec 2025 – Dec 2026</td><td>Northgate (switched)</td><td class="num">£689</td><td class="num">£612</td><td class="num">£77</td></tr>
+                        <tr><td>Dec 2024 – Dec 2025</td><td>Copperfield (stayed)</td><td class="num">–</td><td class="num">£498</td><td class="num">–</td></tr>
+                      </tbody>
+                    </table></div>
+                  </div>
+                </div>
+              </td></tr>
+              <tr><td class="name">Broadband<span class="meta">Brightwire · Joint · direct debit</span></td><td><span class="pill now">in 21 days</span><span class="tip">9 Dec 2026</span></td><td class="num">£58 a month</td><td class="num"><span class="pill up">up 12%</span></td><td class="num"><a href="#m4">Renew</a></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+      <h3>How it behaves</h3>
+      <ul>
+        <li><b>Opens inside the row, not in a pop-up</b>, so the dates and current price stay visible while you type.</li>
+        <li><b>"Saved"</b> is the renewal quote minus what you chose, worked out as a yearly figure so monthly and yearly prices compare fairly.</li>
+        <li><b>The new end date defaults to a year later.</b> Broadband and mobile might be 18 or 24 months, so it's editable.</li>
+        <li><b>A rise without switching</b> shows as "up 12%" on the list.</li>
+        <li>Every past term is kept, so you can see the price over several years.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 5 · Adding -->
+  <section class="mock" aria-labelledby="m5">
+    <div class="mock-title"><h2 id="m5">Adding a renewal, with suggestions from payments</h2></div>
+    <div class="screen">
+      <nav class="side" aria-label="Mock sidebar">
+        <div class="brand">slopFi</div><div class="house">Household · Alex and Sam</div>
+        <div class="grp">Review</div>
+        <div class="nav"><svg><use href="#i-review"/></svg>Review<span class="n">1</span></div>
+        <div class="nav"><svg><use href="#i-list"/></svg>Transactions</div>
+        <div class="nav on"><svg><use href="#i-cal"/></svg>Renewals<span class="n">3</span></div>
+      </nav>
+      <div class="main">
+        <div class="panel">
+          <div class="panel-head"><h4>From your payments</h4><span class="muted">Direct debits that look like contracts</span></div>
+          <div class="suggest">
+            <div class="sg"><span class="name">PETPLAN<span class="meta">Pets / Pet insurance · 14 months</span></span><span class="amt">£24.10 a month</span><button class="btn" type="button"><svg><use href="#i-plus"/></svg>Add</button></div>
+            <div class="sg"><span class="name">VODAFONE LTD<span class="meta">Utilities / Broadband &amp; phone · 9 months</span></span><span class="amt">£12.00 a month</span><button class="btn" type="button"><svg><use href="#i-plus"/></svg>Add</button></div>
+          </div>
+          <p class="muted">Only payments in Housing, Utilities, Transport and Pets categories are suggested. Dismiss one and it won't come back.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h4>Add renewal</h4></div>
+          <div class="form-grid">
+            <label class="field">Name<span class="input">Pet insurance</span></label>
+            <div class="field">Kind<span class="input select">Insurance<svg><use href="#i-down"/></svg></span></div>
+            <label class="field">Provider<span class="input">Petplan</span></label>
+            <div class="field">Owner<span class="input select">Joint<svg><use href="#i-down"/></svg></span></div>
+          </div>
+          <div class="form-grid">
+            <label class="field">Ends<span class="input">3 Sep 2027</span></label>
+            <label class="field">Price<span class="input">£ 24.10<span class="unit">a month</span></span></label>
+            <label class="field">Remind me<span class="input">3 months<span class="unit">ahead</span></span></label>
+            <label class="field">Matches payments<span class="input">PETPLAN</span></label>
+          </div>
+          <div class="row-actions"><button class="btn primary" type="button">Add renewal</button><button class="btn" type="button">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+      <h3>How it behaves</h3>
+      <ul>
+        <li><b>Suggestions fill in the form</b>: name, price, category and the payee to match. You add the end date, because statements don't contain it.</li>
+        <li><b>The reminder time defaults by kind:</b> 6 months for the mortgage fix, 3 months for everything else. Editable per renewal.</li>
+        <li><b>"Matches payments"</b> links it to your statements, so "Paying now" stays up to date and a direct debit change shows up.</li>
+      </ul>
+    </aside>
+  </section>
+</div>

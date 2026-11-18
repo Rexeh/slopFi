@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Renewals{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('renewals.css') }}">{% endblock %}
+{% macro val(field, default='') %}{{ form[field] if field in form else (default if default is not none else '') }}{% endmacro %}
+{% macro err(field) %}{% if errors[field] %}<span class="field-error" id="err-{{ field }}">{{ errors[field] }}</span>{% endif %}{% endmacro %}
+{% macro invalid(field) %}{% if errors[field] %} aria-invalid="true" aria-describedby="err-{{ field }}"{% endif %}{% endmacro %}
+{% macro period_select(name, chosen, label) %}<select name="{{ name }}" id="f-{{ name }}" aria-label="{{ label }}">{% for p, l in periods.items() %}<option value="{{ p }}" {{ 'selected' if chosen == p }}>{{ l or 'one payment' }}</option>{% endfor %}</select>{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Renewals</h1>
+    <p class="status-line">Contracts and dates that need a decision before they roll over.{% if due_n %} <b>{{ due_n }} {{ 'is' if due_n == 1 else 'are' }} due</b> before the next close.{% endif %}</p>
+  </div>
+  <div class="tools"><a class="btn btn-primary" href="/renewals?add=1#renewal-form">{{ icon('plus', small=True) }}Add renewal</a></div>
+</div>
+
+{% if form_open %}
+{% set e = editing %}
+{% set p = prefill or {} %}
+{% set is_mortgage = e and e.holding_id %}
+<section class="panel renewal-form" id="renewal-form" aria-labelledby="renewal-form-title">
+  <div class="panel-head"><h2 id="renewal-form-title">{{ ('Edit ' ~ e.name) if e else 'Add renewal' }}</h2></div>
+  <form method="post" action="/renewals{{ ('/' ~ e.id) if e else ('/' ~ form.renewal_id if form.renewal_id else '') }}" id="renewal-details">
+    {% if is_mortgage %}
+    <p class="panel-note">The end date, payment and lender come from the mortgage on <a href="/networth">Net worth</a>; change them there.</p>
+    <div class="form-grid">
+    {% else %}
+    <div class="form-grid">
+      <label class="field">Name <input name="name" id="f-name" required value="{{ val('name', e.name if e else p.name) }}" placeholder="Car insurance, MOT"{{ invalid('name') }}>{{ err('name') }}</label>
+      <label class="field">Kind <select name="kind" id="f-kind">{% set k_now = val('kind', e.kind if e else (p.kind or 'insurance')) %}{% for k, l in kinds.items() %}<option value="{{ k }}" {{ 'selected' if k_now == k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label class="field">Provider <input name="provider" id="f-provider" value="{{ val('provider', e.provider if e else p.provider) }}" placeholder="Optional"></label>
+      <label class="field">Owner <select name="owner" id="f-owner">{% set o_now = val('owner', e.owner if e else 'joint') %}{% for o, l in owners.items() %}<option value="{{ o }}" {{ 'selected' if o_now == o }}>{{ l }}</option>{% endfor %}</select></label>
+      <label class="field">Ends <input type="date" name="ends_on" id="f-ends_on" required value="{{ val('ends_on', e.ends_on if e else '') }}"{{ invalid('ends_on') }}>
+        {% if errors.ends_on %}{{ err('ends_on') }}{% else %}<span class="field-help">Statements don't show this; check the policy or contract.</span>{% endif %}</label>
+      <div class="field price-field"><label for="f-price">Price £</label>
+        <span class="price-pair"><input name="price" id="f-price" class="w-8ch" inputmode="decimal" value="{{ val('price', ('%.2f' % e.price) if e and e.price is not none else (('%.2f' % p.last) if p.last else '')) }}"{{ invalid('price') }}>{{ period_select('price_period', val('price_period', e.price_period if e else 'month'), 'Price is paid') }}</span>{{ err('price') }}</div>
+      <label class="field">Matches payments <select name="payee_key" id="f-payee_key">{% set pk = val('payee_key', e.payee_key if e else p.payee_key) %}<option value="">Not linked</option>{% for c in payees %}<option value="{{ c.merchant }}" {{ 'selected' if pk == c.merchant }}>{{ c.merchant }} · {{ c.category or 'Uncategorised' }}</option>{% endfor %}</select>
+        <span class="field-help">Links it to your statements, so a price change shows up.</span></label>
+    {% endif %}
+      <div class="field"><label for="f-lead_months">Remind me</label>
+        <span class="price-pair"><input name="lead_months" id="f-lead_months" class="w-6ch" inputmode="numeric" value="{{ val('lead_months', ((e.lead_days / 30.44) | round | int) if e and e.lead_days != (183 if is_mortgage else 91) else '') }}" placeholder="{{ 6 if is_mortgage else 3 }}"{{ invalid('lead_months') }}><span class="unit">months ahead</span></span>
+        {% if errors.lead_months %}{{ err('lead_months') }}{% else %}<span class="field-help">Blank: {{ '6 months' if is_mortgage else '3 months' }}.</span>{% endif %}</div>
+      <label class="field">Notes <input name="notes" id="f-notes" value="{{ val('notes', e.notes if e else '') }}" placeholder="SIM only, 24-month term"></label>
+    </div>
+  </form>
+  <div class="form-foot">
+    {% if e and not is_mortgage %}
+    <form method="post" action="/renewals/{{ e.id }}/delete" data-confirm="Delete {{ e.name }}?" data-confirm-detail="Its renewal history goes with it. This can't be undone.">
+      <button type="submit" class="btn btn-danger">{{ icon('trash', small=True) }}Delete</button>
+    </form>
+    {% endif %}
+    <div class="actions">
+      <a class="btn" href="/renewals">Cancel</a>
+      <button type="submit" form="renewal-details" class="btn btn-primary">{{ 'Save changes' if e else 'Add renewal' }}</button>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel" aria-labelledby="register-title">
+  <h2 id="register-title" class="visually-hidden">All renewals</h2>
+  {% if not rows %}
+  <div class="empty">
+    <span class="empty-icon">{{ icon('calendar') }}</span>
+    <h3>No renewals yet</h3>
+    <p>Add the contracts and dates you want to act on before they roll over: insurance, energy, broadband, mobile, MOT and road tax. A mortgage fix on Net worth appears here by itself.</p>
+    <a class="btn" href="/renewals?add=1#renewal-form">{{ icon('plus', small=True) }}Add renewal</a>
+  </div>
+  {% else %}
+  <dl class="renewal-summary">
+    <div><dt>A year across {{ rows | rejectattr('archived') | list | length }} renewals</dt><dd>{{ yearly | money_whole }}</dd></div>
+    <div class="{{ 'is-good' if saved > 0 }}"><dt>Saved at renewal in {{ year }}</dt><dd>{{ saved | money_whole }}</dd></div>
+    <div><dt>{% if suggestions %}<a href="#suggest-title">Suggested from your payments</a>{% else %}Suggested from your payments{% endif %}</dt><dd>{{ suggestions | length }}</dd></div>
+  </dl>
+  <div class="table-scroll"><table class="data renewals-table">
+    <thead><tr><th scope="col">Renewal</th><th scope="col">Ends</th><th scope="col" class="num">Paying now</th><th scope="col" class="num">Last time</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    {% for key, label, items in sections if items %}
+    <tbody class="group"><tr class="group-row"><th scope="rowgroup" colspan="5">{{ label }}</th></tr></tbody>
+    {% for r in items %}
+    <tbody id="r-{{ r.id }}" class="renewal{{ ' is-open' if expanded and expanded.id == r.id }}">
+      <tr>
+        <td><span class="renewal-name">{{ r.name }}</span>{% if r.holding_id %} <span class="badge badge-accent">From Net worth</span>{% endif %}
+          <span class="kind-line">{{ [r.provider, r.owner_label, r.how_paid, r.notes] | select | join(' · ') }}</span></td>
+        <td class="nowrap"><span class="badge {{ 'badge-warning' if key == 'due' }}">{{ r.when }}</span><span class="date-line">{{ day_label(r.ends_on) }}</span></td>
+        <td class="num">{% if r.price is not none %}{{ r.price | money }}{% if r.period_label %} {{ r.period_label }}{% endif %}{% else %}–{% endif %}
+          {% if r.latest_payment %}<span class="date-line">latest payment {{ r.latest_payment | money }}</span>{% endif %}</td>
+        <td class="num{{ ' last-empty' if not (r.last and (r.last.saved or r.last.rise_pct)) }}">{% if r.last and r.last.saved %}<span class="badge badge-positive">saved {{ r.last.saved | money_whole }}</span>{% elif r.last and r.last.rise_pct %}<span class="badge badge-negative">up {{ r.last.rise_pct }}%</span>{% else %}–{% endif %}</td>
+        <td class="row-actions nowrap">
+          {% if expanded and expanded.id == r.id %}<a class="btn-quiet" href="/renewals#r-{{ r.id }}">Close</a>
+          {% else %}<a class="btn-quiet" href="/renewals?renew={{ r.id }}#r-{{ r.id }}">{{ 'Done' if r.kind == 'car' else 'Renew' }}<span class="visually-hidden"> {{ r.name }}</span></a>{% endif %}
+          <a class="btn-quiet" href="/renewals?edit={{ r.id }}#renewal-form">{{ icon('edit', small=True) }}Edit<span class="visually-hidden"> {{ r.name }}</span></a>
+        </td>
+      </tr>
+      {% if expanded and expanded.id == r.id %}
+      <tr class="renew-row"><td colspan="5">
+        {% include "_renewal_form.html" %}
+      </td></tr>
+      {% endif %}
+    </tbody>
+    {% endfor %}
+    {% endfor %}
+  </table></div>
+  {% if archived %}
+  <details class="disclosure archived">
+    <summary>Archived ({{ archived | length }})</summary>
+    <p class="panel-note">Mortgage fixes whose mortgage was removed or no longer has a fix end date on Net worth. Their history is kept.</p>
+    {% for r in archived %}
+    <div class="archived-item">
+      <h3>{{ r.name }}<span class="kind-line">{{ [r.provider, ('ended ' ~ day_label(r.ends_on)) if r.ends_on else None] | select | join(' · ') }}</span></h3>
+      {% set history = archived_history[r.id] %}
+      {% if history %}{% set read_only = True %}{% include "_renewal_history.html" %}{% else %}<p class="panel-note">No renewals recorded.</p>{% endif %}
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+  {% endif %}
+</section>
+{% if suggestions %}
+<section class="panel" aria-labelledby="suggest-title">
+  <div class="panel-head"><h2 id="suggest-title">From your payments</h2><div class="tools"><span class="muted">Direct debits that look like contracts</span></div></div>
+  <ul class="suggestions">
+  {% for s in suggestions %}
+    <li><span class="suggest-name">{{ s.provider }}<span class="kind-line">{{ s.category }} · {{ s.months }} months</span></span>
+      <span class="suggest-amount">{{ s.per_month | money }} a month</span>
+      <span class="actions">
+        <a class="btn btn-sm" href="/renewals?add=1&payee={{ s.payee_key | urlencode }}#renewal-form">{{ icon('plus', small=True) }}Add</a>
+        <form method="post" action="/renewals/suggestions/dismiss" class="inline"><input type="hidden" name="payee_key" value="{{ s.payee_key }}"><button type="submit" class="btn-quiet" aria-label="Don't suggest {{ s.provider }} again">Dismiss</button></form>
+      </span></li>
+  {% endfor %}
+  </ul>
+  <p class="panel-note">Direct debits and standing orders in Housing, Utilities, Transport and Pets, and anything filed as insurance. Dismiss one and it won't come back.</p>
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('renewals.js') }}" defer></script>{% endblock %}

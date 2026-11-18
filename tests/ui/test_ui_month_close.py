@@ -26,7 +26,7 @@ def test_close_september_from_the_sidebar_checklist(page, household):
     page.get_by_role("button", name=re.compile(r"Apply category to \d+ selected")).click()
     expect(page.locator("#toast")).to_contain_text(re.compile(rf"Filed \d+ under {re.escape(leaf)}"))
     expect(page.locator("#checklist li", has=page.locator('a[href*="uncategorised"]'))).to_have_class(re.compile(r"\bis-done\b"))
-    expect(page.locator("#checklist")).to_contain_text("4 of 5")
+    expect(page.locator("#checklist")).to_contain_text("4 of 6")   # renewals: the demo has some due
 
     # 2. balances: Update balances opens every editable row; re-enter each shown balance
     page.goto("/networth")
@@ -41,7 +41,14 @@ def test_close_september_from_the_sidebar_checklist(page, household):
     page.get_by_role("button", name="Save balances").click()
     expect(page.locator("#toast")).to_contain_text(re.compile(r"\d+ balances? saved"))
 
-    # 3. close: every step done, so the button works
+    # 3. renewals: put each due one off to the next close (only this month's list is cleared)
+    page.goto("/review?month=2026-09")
+    defer = page.get_by_role("button", name=re.compile(r"^Look at .+ at the next close$"))
+    while defer.count():
+        defer.first.click()
+        expect(page.locator("#toast")).to_contain_text("moved to next close")
+
+    # 4. close: every step done, so the button works
     page.goto("/review?month=2026-09")
     expect(page.locator("li.step.is-todo")).to_have_count(0)
     close = page.get_by_role("button", name="Close September").first

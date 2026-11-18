@@ -1,0 +1,21 @@
+{#- Past renewals of `r`, newest first; `read_only` hides Undo (archived rows). -#}
+<div class="renew-history">
+  <h3>History</h3>
+  <div class="table-scroll"><table class="data">
+    <thead><tr><th scope="col">Recorded</th><th scope="col">{{ 'Lender' if r.holding_id else 'Provider' }}</th><th scope="col" class="num">Renewal quote</th><th scope="col" class="num">Paid</th><th scope="col" class="num">Saved</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr><td class="nowrap" data-label="Recorded">{{ day_label(h.recorded_on) }}</td>
+        <td data-label="{{ 'Lender' if r.holding_id else 'Provider' }}">{% if h.outcome == 'switched' %}{{ h.old_provider or '–' }} → {{ h.new_provider or '–' }}{% else %}{{ h.new_provider or '–' }} ({{ h.outcome }}){% endif %}</td>
+        <td class="num" data-label="Renewal quote">{% if h.quote is not none %}{{ h.quote | money }} {{ periods[h.quote_period] }}{% else %}–{% endif %}</td>
+        <td class="num" data-label="Paid">{% if h.new_price is not none %}{{ h.new_price | money }} {{ periods[h.new_period] }}{% else %}–{% endif %}</td>
+        <td class="num" data-label="Saved">{{ h.saved | money_whole if h.saved else '–' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if not read_only %}
+  <form method="post" action="/renewals/{{ r.id }}/events/latest/delete" class="inline" data-confirm="Undo the last renewal of {{ r.name }}?" data-confirm-detail="{% if r.holding_id %}Puts back the previous fix end, rate, payment and lender on Net worth, replacing any change made there since.{% else %}Puts back the previous provider, price and end date.{% endif %}" data-confirm-label="Undo">
+    <button type="submit" class="btn-quiet">Undo last renewal</button>
+  </form>
+  {% endif %}
+</div>

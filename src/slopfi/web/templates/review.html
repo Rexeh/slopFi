@@ -77,6 +77,23 @@
             </span></li>
         {% endfor %}
         </ul>
+        {% elif s.key == 'renewals' and s.renewals %}
+        {#- Each due renewal on its own line: renew it now, or put it off to the next close (this month only). -#}
+        <p>{{ s.detail }} Renew it now, or choose <b>Look at it next close</b> to put it off: it comes back on next month's list.</p>
+        <ul class="spikes">
+        {% for r in s.renewals %}
+          <li class="{{ 'is-accepted' if r.deferred }}"><span><b>{{ r.name }}</b> {% if r.days_left < 0 %}ended {{ -r.days_left }} day{{ 's' if r.days_left != -1 }} ago{% else %}ends {{ r.ends_on | day_label }}{% endif %}<span class="muted">{% if r.provider %} · {{ r.provider }}{% endif %}</span></span>
+            <span class="spike-actions">
+            {% if r.deferred %}
+              <span class="spike-accepted">{{ icon('check', small=True) }}Next close</span>
+              {% if not c.closed %}<form method="post" action="/review/undefer-renewal" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><input type="hidden" name="renewal_id" value="{{ r.id }}"><button type="submit" class="btn-quiet" aria-label="Undo putting off {{ r.name }}">Undo</button></form>{% endif %}
+            {% else %}
+              <a class="btn-quiet" href="/renewals?renew={{ r.id }}#r-{{ r.id }}">{{ 'Done' if r.kind == 'car' else 'Renew' }} {{ r.name }}{{ icon('chevron-right', small=True) }}</a>
+              {% if not c.closed %}<form method="post" action="/review/defer-renewal" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><input type="hidden" name="renewal_id" value="{{ r.id }}"><button type="submit" class="btn btn-sm" aria-label="Look at {{ r.name }} at the next close">Look at it next close</button></form>{% endif %}
+            {% endif %}
+            </span></li>
+        {% endfor %}
+        </ul>
         {% else %}
         <p>{{ s.detail }}</p>
         {% endif %}

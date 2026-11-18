@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-from .. import categorise, db, household as household_mod, overview, projection, reports, review, rules_io
+from .. import categorise, db, household as household_mod, overview, projection, renewals, reports, review, rules_io
 from .. import sync as sync_mod
 from . import household, writers
 
@@ -155,6 +155,35 @@ def _holdings(conn, hh: household.Household) -> dict[str, int]:
     return ids
 
 
+def _renewals(conn, hh: household.Household) -> None:
+    """A few renewals, dated from the demo's last day: car insurance switched a year ago (so it has history) and
+    soon due again, an MOT coming up, broadband and energy linked to their direct debits. Home and pet insurance
+    are left for the suggestions; the mortgage fix comes from its holding."""
+    end = hh.end
+    car_end = end + timedelta(days=45)
+    car = renewals.save_renewal(conn, {"name": "Car insurance", "kind": "insurance", "provider": "Copperfield Insurance",
+                                       "owner": "alex", "ends_on": (car_end - timedelta(days=365)).isoformat(),
+                                       "price": 498.0, "price_period": "year"})
+    renewals.record(conn, car, {"outcome": "switched", "quote": 689.0, "quote_period": "year", "other_quote": 574.80,
+                                "other_period": "year", "other_provider": "Motorwise", "new_provider": "Motorwise",
+                                "new_price": 47.90, "new_period": "month", "new_ends_on": car_end.isoformat()},
+                    car_end - timedelta(days=380))
+    renewals.save_renewal(conn, {**_renewal_fields(conn, car), "payee_key": "MOTORWISE INSURANCE"}, car)
+    for data in (
+        {"name": "MOT", "kind": "car", "provider": "Exampletown Garage", "ends_on": end + timedelta(days=100),
+         "price": 54.85, "price_period": "once"},
+        {"name": "Broadband", "kind": "broadband", "provider": "Fibreline", "ends_on": end + timedelta(days=150),
+         "price": 41.50, "price_period": "month", "payee_key": "FIBRELINE BROADBAND", "notes": "18-month term"},
+        {"name": "Energy fixed tariff", "kind": "energy", "provider": "Brightspark", "ends_on": end + timedelta(days=240),
+         "price": 118.0, "price_period": "month", "payee_key": "BRIGHTSPARK ENERGY"},
+    ):
+        renewals.save_renewal(conn, {"owner": "joint", **data, "ends_on": data["ends_on"].isoformat()})
+
+
+def _renewal_fields(conn, renewal_id: int) -> dict:
+    return dict(conn.execute(f"SELECT {', '.join(renewals.FIELDS)} FROM renewals WHERE id = ?", (renewal_id,)).fetchone())
+
+
 def _snapshot(conn, hh: household.Household) -> str:
     """One balance snapshot about three months back for the Monzo accounts, which have no statement balance then
     (one PDF for the year; the CSV has no balances at all), so Net worth over time has a second point."""
@@ -212,6 +241,7 @@ def build(out: str | Path = DEFAULT_DIR, seed: int = 42, force: bool = False, re
         categorise.apply_rules(conn)
 
         holdings = _holdings(conn, hh)
+        _renewals(conn, hh)
         _snapshot(conn, hh)
         for name, target in TARGETS.items():
             reports.set_budget(conn, db.category_id_by_path(conn, name), target)

@@ -1,0 +1,54 @@
+{#- The renew form inside an expanded row (`r` = the renewal), with its history. Car dates record "done"; the mortgage
+    also takes the new rate and payment, and saving writes them to Net worth. -#}
+{% set is_car = r.kind == 'car' %}
+{% set is_mortgage = r.holding_id %}
+<form method="post" action="/renewals/{{ r.id }}/renew" class="renew-form" id="renew-form" data-current="{{ r.price or '' }}" data-current-period="{{ r.price_period }}">
+  {% if is_car %}
+  <input type="hidden" name="outcome" value="done">
+  <div class="renew-grid">
+    <div class="field price-field"><label for="f-new_price">Price paid £</label>
+      <span class="price-pair"><input name="new_price" id="f-new_price" class="w-8ch" inputmode="decimal" value="{{ val('new_price', ('%.2f' % r.price) if r.price is not none else '') }}"{{ invalid('new_price') }}>{{ period_select('new_period', val('new_period', r.price_period), 'Price paid is') }}</span>{{ err('new_price') }}</div>
+    <label class="field">Done on <input type="date" name="done_on" id="f-done_on" value="{{ val('done_on', today) }}"{{ invalid('done_on') }}>{{ err('done_on') }}</label>
+    <label class="field">Next due <input type="date" name="new_ends_on" id="f-new_ends_on" required value="{{ val('new_ends_on', default_end) }}"{{ invalid('new_ends_on') }}>{{ err('new_ends_on') }}</label>
+  </div>
+  {% else %}
+  <div class="renew-grid">
+    <div class="field price-field"><label for="f-quote">Renewal quote{% if r.provider %} from {{ r.provider }}{% endif %} £</label>
+      <span class="price-pair"><input name="quote" id="f-quote" class="w-8ch" inputmode="decimal" value="{{ val('quote') }}" placeholder="Optional"{{ invalid('quote') }}>{{ period_select('quote_period', val('quote_period', (history[0].quote_period if history and history[0].quote_period else r.price_period)), 'Renewal quote is') }}</span>{{ err('quote') }}</div>
+    <div class="field price-field"><label for="f-other_quote">Best other quote £</label>
+      <span class="price-pair"><input name="other_quote" id="f-other_quote" class="w-8ch" inputmode="decimal" value="{{ val('other_quote') }}" placeholder="Optional"{{ invalid('other_quote') }}>{{ period_select('other_period', val('other_period', (history[0].quote_period if history and history[0].quote_period else r.price_period)), 'Other quote is') }}</span>{{ err('other_quote') }}</div>
+    <label class="field">Other provider <input name="other_provider" id="f-other_provider" value="{{ val('other_provider') }}" placeholder="Optional"></label>
+  </div>
+  <fieldset class="outcome">
+    <legend>What did you do?</legend>
+    {% set chosen = val('outcome', 'stayed') %}
+    {% for o, l in (('stayed', 'Stayed'), ('switched', 'Switched'), ('haggled', 'Haggled')) %}
+    <label><input type="radio" name="outcome" value="{{ o }}" {{ 'checked' if chosen == o }}><span>{{ l }}</span></label>
+    {% endfor %}
+  </fieldset>
+  <div class="renew-grid">
+    <label class="field">{{ 'Lender' if is_mortgage else 'Provider' }} <input name="new_provider" id="f-new_provider" value="{{ val('new_provider', r.provider) }}" data-current="{{ r.provider or '' }}"></label>
+    {% if not is_mortgage %}
+    <div class="field price-field"><label for="f-new_price">New price £</label>
+      <span class="price-pair"><input name="new_price" id="f-new_price" class="w-8ch" inputmode="decimal" required value="{{ val('new_price', ('%.2f' % r.price) if r.price is not none else '') }}"{{ invalid('new_price') }}>{{ period_select('new_period', val('new_period', r.price_period), 'New price is') }}</span>{{ err('new_price') }}</div>
+    {% endif %}
+    <label class="field">New end date <input type="date" name="new_ends_on" id="f-new_ends_on" required value="{{ val('new_ends_on', default_end) }}"{{ invalid('new_ends_on') }}>{{ err('new_ends_on') }}</label>
+    {% if is_mortgage %}
+    <label class="field">New rate % <input name="new_rate" id="f-new_rate" class="w-6ch" inputmode="decimal" value="{{ val('new_rate') }}"{{ invalid('new_rate') }}>{{ err('new_rate') }}</label>
+    <label class="field">New monthly payment £ <input name="new_payment" id="f-new_payment" class="w-8ch" inputmode="decimal" value="{{ val('new_payment', '%.2f' % r.price if r.price is not none else '') }}"{{ invalid('new_payment') }}>{{ err('new_payment') }}</label>
+    <input type="hidden" name="new_period" value="month">
+    {% endif %}
+  </div>
+  <p class="renew-result" id="renew-result" aria-live="polite"></p>
+  {% endif %}
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">{{ 'Save' if is_car else 'Save renewal' }}</button>
+    {% if r.group == 'due' and close_month %}<button type="submit" form="defer-form" class="btn">Look at it next close</button>{% endif %}
+    <a class="btn" href="/renewals#r-{{ r.id }}">Cancel</a>
+    <span class="small muted">{% if is_mortgage %}Saving updates the fix end, rate, payment and lender on Net worth.{% elif is_car %}The next due date moves on; the price paid is kept in the history.{% else %}The term you're replacing moves to the history.{% endif %}</span>
+  </div>
+</form>
+{% if r.group == 'due' and close_month %}
+<form method="post" action="/review/defer-renewal" id="defer-form" hidden><input type="hidden" name="month" value="{{ close_month }}"><input type="hidden" name="renewal_id" value="{{ r.id }}"><input type="hidden" name="back" value="/renewals#r-{{ r.id }}"></form>
+{% endif %}
+{% if history %}{% set read_only = False %}{% include "_renewal_history.html" %}{% endif %}

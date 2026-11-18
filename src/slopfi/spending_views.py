@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from . import reports, review
+from . import clock, reports, review
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 SLOTS = 6                       # categorical chart slots used by the matrix and the small multiples
@@ -388,7 +388,7 @@ def history(conn: sqlite3.Connection) -> list[dict]:
 def networth_view(conn: sqlite3.Connection, today: date | None = None) -> dict:
     from . import household
 
-    today = today or date.today()
+    today = today or clock.today()
     nw = reports.net_worth(conn)
     owners = household.owner_choices(conn)
     for a in nw["accounts"]:

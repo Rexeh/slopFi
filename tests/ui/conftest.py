@@ -14,9 +14,11 @@ from datetime import date
 import pytest
 import uvicorn
 
+from slopfi import clock
 from slopfi.demo import build as demo_build
 
 REFERENCE = date(2026, 10, 3)   # the demo's latest month is October 2026, still open
+TODAY = date(2026, 11, 18)      # the app's today: six weeks on, so a Monzo balance is stale and some renewals are due
 
 
 def pytest_collection_modifyitems(items):
@@ -48,6 +50,12 @@ def base_url():
     yield f"http://127.0.0.1:{port}"
     server.should_exit = True
     thread.join(5)
+
+
+@pytest.fixture(autouse=True)
+def _pinned_today(monkeypatch):
+    """A fixed today, so what is due, stale or open never drifts with the calendar."""
+    monkeypatch.setattr(clock, "today", lambda: TODAY)
 
 
 @pytest.fixture(autouse=True)

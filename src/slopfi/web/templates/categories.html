@@ -28,10 +28,11 @@
       <tr class="{{ 'top' if c is sameas t else 'sub' }}" id="cat-{{ c.id }}">
         <td>{{ c.name }}</td><td>{{ c.kind_label }}</td>
         <td>{% if c is not sameas t and t.spread %}Spread over 12 months (from {{ t.name }}){% elif t.kind == 'expense' %}
-          <form method="post" action="/categories/{{ c.id }}/spread" class="inline">
+          <form method="post" action="/categories/{{ c.id }}/spread" class="inline"
+                hx-post="/categories/{{ c.id }}/spread" hx-target="closest tbody" hx-select="table.categories tbody" hx-swap="outerHTML">
             <input type="hidden" name="spread" value="{{ 0 if c.spread else 1 }}">
             {{ 'Spread over 12 months' if c.spread else 'Month by month' }}
-            <button class="btn-quiet" aria-label="Change: {{ 'show ' ~ c.path ~ ' month by month' if c.spread else 'spread ' ~ c.path ~ ' over 12 months' }}">Change</button>
+            <button class="btn-quiet" id="cat-{{ c.id }}-spread" aria-label="Change: {{ 'show ' ~ c.path ~ ' month by month' if c.spread else 'spread ' ~ c.path ~ ' over 12 months' }}">Change</button>
           </form>{% endif %}</td>
         <td class="num">{% if c.n_txn %}<a href="/transactions?month=all&category_id={{ c.id }}">{{ c.n_txn }}</a>{% else %}0{% endif %}</td>
         <td class="num">{{ c.n_rules }}</td>

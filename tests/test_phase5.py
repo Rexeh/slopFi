@@ -123,8 +123,9 @@ def test_category_spread_toggle(db_path):
     assert "Spread over 12 months" in client.get("/categories").text
     r = client.post(f"/categories/{salary}/spread", data={"spread": "1"}, follow_redirects=False)
     assert "Only spending categories can be spread" in _flash(r)
-    r = client.post(f"/categories/{groceries}/spread", data={"spread": "0"}, follow_redirects=False)
-    assert "month by month again" in _flash(r)
+    r = client.post(f"/categories/{groceries}/spread", data={"spread": "0"}, headers={"HX-Request": "true"})
+    assert r.status_code == 200 and "month by month again" in r.headers["HX-Trigger"]   # swapped in place: no reload, no jump
+    assert f'id="cat-{groceries}-spread"' in r.text
     assert db.connect(db_path).execute("SELECT spread FROM categories WHERE id = ?", (groceries,)).fetchone()[0] == 0
 
 

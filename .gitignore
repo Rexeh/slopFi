@@ -32,3 +32,4 @@ pii.local.txt
 # docker: local settings and the default data folder
 .env
 docker-data/
+test-results/

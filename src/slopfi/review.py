@@ -1,16 +1,16 @@
-"""Month-close review: the five-step checklist for the latest open month, and closed months."""
+"""Month-close review: the six-step checklist for the latest open month, and closed months."""
 from __future__ import annotations
 
 import calendar
 import sqlite3
 from datetime import date, timedelta
 
-from . import reports
+from . import clock, renewals, reports
 from .db import now_iso
 
 STALE_DAYS = 30          # a balance older than this needs updating
 SPIKE_FACTOR = 2.0       # a category more than this many times its 3-month average is a possible one-off
-STEPS = 5
+STEPS = 6
 
 
 # ------------------------------------------------------------- closed months
@@ -31,7 +31,7 @@ def reopen_month(conn: sqlite3.Connection, month: str) -> None:
 def latest_open_month(conn: sqlite3.Connection, today: date | None = None) -> str | None:
     """Newest month with data that is not closed and is not the current (still running) calendar month.
     If only the current month has data, that is the open month."""
-    today = today or date.today()
+    today = today or clock.today()
     months = reports.months_available(conn)          # newest first
     if not months:
         return None
@@ -192,9 +192,39 @@ def _over_target(conn: sqlite3.Connection, month: str) -> list[dict]:
     return out
 
 
+def defer_renewal(conn: sqlite3.Connection, month: str, renewal_id: int) -> None:
+    """Look at a due renewal at the next close instead: ticks it off `month`'s checklist only."""
+    with conn:
+        conn.execute("INSERT OR REPLACE INTO deferred_renewals (month, renewal_id, deferred_at) VALUES (?, ?, ?)",
+                     (month, renewal_id, now_iso()))
+
+
+def undefer_renewal(conn: sqlite3.Connection, month: str, renewal_id: int) -> None:
+    with conn:
+        conn.execute("DELETE FROM deferred_renewals WHERE month = ? AND renewal_id = ?", (month, renewal_id))
+
+
+def _renewals_step(conn: sqlite3.Connection, month: str, today: date) -> dict:
+    """Renewals are judged from today, so only for the latest open month; any other month shows the step as done."""
+    step = {"key": "renewals", "title": "Renewals checked", "href": "/renewals", "renewals": []}
+    if month != latest_open_month(conn, today):
+        return {**step, "done": True, "count": "–", "action": "Open", "detail": "Checked at the latest open month."}
+    if not conn.execute("SELECT 1 FROM renewals LIMIT 1").fetchone():
+        return {**step, "done": True, "count": "none", "action": "Add renewals", "detail": "No renewals recorded yet."}
+    deferred = {r[0] for r in conn.execute("SELECT renewal_id FROM deferred_renewals WHERE month = ?", (month,))}
+    rows = [{**r, "deferred": r["id"] in deferred} for r in renewals.due(conn, today)]
+    open_ = [r for r in rows if not r["deferred"]]
+    n = len(rows)
+    return {**step, "renewals": rows, "done": not open_,
+            "count": f"{len(open_)} due" if open_ else ("none due" if not rows else f"{n} next close"),
+            "action": f"Renewals ({len(open_)})" if open_ else "Open",
+            "detail": (f"{n} renewal{' needs' if n == 1 else 's need'} a decision before the next close." if rows
+                       else "Nothing needs a decision before the next close.")}
+
+
 def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | None = None) -> dict:
-    """The five month-close steps for `month` (default: the latest open month)."""
-    today = today or date.today()
+    """The six month-close steps for `month` (default: the latest open month)."""
+    today = today or clock.today()
     closed = closed_months(conn)
     month = month or latest_open_month(conn, today) or (closed[0] if closed else None)   # all closed: show the newest
     uncategorised_total = conn.execute("SELECT COUNT(*) FROM transactions WHERE category_id IS NULL").fetchone()[0]
@@ -240,6 +270,7 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
          "href": "/spending", "action": "Set targets" if not has_targets else "Review",
          "detail": "; ".join(f"{o['name']} {reports.money_whole(o['over'])} over" for o in over) if over
                    else ("No category is over its target." if has_targets else "No targets set yet."), "over": over},
+        _renewals_step(conn, month, today),
     ]
     done = sum(1 for s in steps if s["done"])
     is_closed = month in closed

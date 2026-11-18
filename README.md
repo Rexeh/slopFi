@@ -28,7 +28,7 @@ If you want to extend it, fork and do as you wish! (As you can probably tell thi
 | | |
 |---|---|
 | ![Spending: small multiples and the category table](assets/screenshots/spending.png) | ![Projection: net worth by asset class over ten years with spending levers](assets/screenshots/projection.png) |
-| ![Net worth: what you own and owe, loan to value, accounts](assets/screenshots/net-worth.png) | ![Review: the five steps to close a month](assets/screenshots/review.png) |
+| ![Net worth: what you own and owe, loan to value, accounts](assets/screenshots/net-worth.png) | ![Review: the six steps to close a month](assets/screenshots/review.png) |
 
 All screenshots show the built-in demo household; every name, number and account is made up.
 
@@ -52,7 +52,8 @@ format: a joint HSBC-style current account (one PDF a month), Alex's Monzo-style
 the year), Sam's Monzo-style CSV export and Alex's Amex-style credit card (one PDF a month). Every name, sort code
 and account number is made up. The build is deterministic: `--seed N` picks a different household, `--out DIR`
 writes somewhere else, `--force` rebuilds. Some merchants are deliberately left without a rule, so the latest
-month has work on the Review checklist.
+month has work on the Review checklist, and a few renewals (car insurance with a year of history, an MOT,
+broadband and energy) are dated from the demo's last day, so some are due.
 
 ## Use
 
@@ -124,7 +125,7 @@ Published Docker ports skip ufw and firewalld, so `SLOPFI_BIND=0.0.0.0` is reach
 ## Using the app
 
 `uv run slopfi serve` and open http://127.0.0.1:8000. A sidebar on every page carries three groups and,
-at its foot, the month-close checklist for the latest open month ("Close September · 3 of 5"); each row
+at its foot, the month-close checklist for the latest open month ("Close September · 3 of 6"); each row
 links to the page that clears it, and the counts update as you work. Below 1024px the sidebar becomes an
 icon rail (the checklist moves to the top of Overview); below 768px it becomes a top bar.
 
@@ -134,6 +135,7 @@ icon rail (the checklist moves to the top of Overview); below 768px it becomes a
 |---|---|---|
 | Review | **Review** | The month-close checklist in full, with the action that clears each step; close or reopen a month. |
 | Review | **Transactions** | Every transaction for a month (or all time): filter, search, categorise one by one or in bulk, mark one-offs, export CSV. |
+| Review | **Renewals** | Contracts and dates to act on before they roll over: insurance, energy, broadband, mobile, MOT and road tax, and the mortgage fix from Net worth. Each is due 3 months before it ends (6 for the mortgage), shows up as the sixth month-close step, and can be put off to the next close. Record each renewal's quote, any other quote and what you chose, and see what shopping around saved. Direct debits that look like contracts are suggested. |
 | Understand | **Overview** | One month at a glance: spending and savings rate against typical (the average of the three complete months before), net worth, where the money went, six months, largest payments. |
 | Understand | **Spending** | Averages per category over the last 3, 6 or 12 complete months against the period before, with tabs for **Categories** (small multiples, the full table, month by month), **Fixed costs** (recurring payments), **Targets** (monthly ceilings per category) and **Savings ideas**. |
 | Understand | **Net worth** | What we own and owe today: account balances, the house and mortgage, ISAs, pensions and loans, loan to value, and the history as each update is kept. |

@@ -1,0 +1,91 @@
+/* Renewals: only what style.css's panels, tables, fields and badges don't already cover. */
+.renewal-summary { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-8); margin: 0 0 var(--space-4); }
+.renewal-summary div { display: flex; flex-direction: column-reverse; gap: 2px; }
+.renewal-summary dt { font-size: var(--text-sm); color: var(--color-ink-2); }
+.renewal-summary dd { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.renewal-summary .is-good dd { color: var(--color-positive); }
+
+.badge-positive { background: var(--color-positive-tint); color: var(--color-positive); }
+.badge-negative { background: var(--color-negative-tint); color: var(--color-negative); }
+.badge-accent { background: var(--color-accent-tint); color: var(--color-accent); }
+
+.renewals-table .renewal-name { font-weight: var(--weight-medium); }
+.renewals-table .kind-line, .renewals-table .date-line { display: block; font-size: var(--text-sm); color: var(--color-ink-3); font-weight: var(--weight-regular); }
+.renewals-table .date-line { margin-top: 2px; }
+.renewals-table td { vertical-align: top; padding-top: var(--space-2); padding-bottom: var(--space-2); }
+.renewals-table .group-row th { background: var(--color-surface-tint); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-ink-2); padding-top: var(--space-1); padding-bottom: var(--space-1); height: auto; text-align: left; }
+.renewals-table tbody.group tr:hover { background: none; }
+.renewals-table .row-actions { text-align: right; }
+.renewals-table .row-actions .btn-quiet { gap: var(--space-1); }
+.renewals-table tbody.is-open > tr:first-child td { border-bottom-color: transparent; }
+.renewals-table tbody.is-open td, .renewals-table tbody.is-open tr:hover { background: var(--color-surface-tint); }
+.renewals-table .renew-row > td { padding: var(--space-2) var(--space-3) var(--space-4); }
+
+.renew-form { display: grid; gap: var(--space-4); }
+.renew-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3) var(--space-5); }
+.price-field label { font: inherit; }
+.price-pair { display: flex; gap: var(--space-2); align-items: center; }
+.price-pair input { flex: 1 1 auto; min-width: 0; }
+.renew-form .field input:not(.w-6ch):not(.w-8ch), .renewal-form .form-grid .field > input:not(.w-6ch):not(.w-8ch), .renewal-form .form-grid .field > select { width: 100%; }
+
+/* Stayed / Switched / Haggled: one joined control, radios underneath for keyboard and screen readers. */
+.outcome { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) 0; }
+.outcome legend { float: left; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink-2); margin-right: var(--space-3); padding: 0; }
+.outcome label { display: inline-flex; position: relative; }
+.outcome label span { border-radius: 0; }
+.outcome label:first-of-type span { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.outcome label:last-of-type span { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.outcome input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.outcome span { white-space: nowrap; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); padding: 4px var(--space-3); font-size: var(--text-table); cursor: pointer; background: var(--color-surface); transition: background var(--duration-fast) var(--ease-standard); }
+.outcome label + label span { margin-left: -1px; }
+.outcome input:checked + span { position: relative; z-index: 1; background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); font-weight: var(--weight-medium); }
+.outcome input:focus-visible + span { box-shadow: var(--focus-ring); }
+
+.renew-result { margin: 0; font-size: var(--text-table); color: var(--color-ink-2); min-height: 1.5em; }
+.renew-result b { color: var(--color-positive); font-weight: var(--weight-semibold); }
+.renew-result b.is-worse { color: var(--color-negative); }
+.price-pair .unit { color: var(--color-ink-3); font-size: var(--text-table); white-space: nowrap; }
+.suggestions .btn-quiet, .renew-history .btn-quiet { font-size: var(--text-table); }
+.archived-item { margin-top: var(--space-4); display: grid; gap: var(--space-2); }
+.archived-item h3 { font-size: var(--text-table); font-weight: var(--weight-semibold); margin: 0; }
+.archived-item .kind-line { display: block; font-size: var(--text-sm); color: var(--color-ink-3); font-weight: var(--weight-regular); }
+.renew-form .actions { flex-wrap: wrap; white-space: normal; }
+
+.renew-history { margin-top: var(--space-5); display: grid; gap: var(--space-2); justify-items: start; }
+.renew-history h3 { font-size: var(--text-table); font-weight: var(--weight-semibold); color: var(--color-ink-2); margin: 0; }
+.renew-history .table-scroll { width: 100%; }
+
+.renewal-form .form-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-5); flex-wrap: wrap; }
+.renewal-form .form-foot .actions { margin-left: auto; }
+.renewal-form .form-foot form { margin: 0; }
+
+.suggestions { list-style: none; margin: 0; padding: 0; }
+.suggestions li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); font-size: var(--text-table); }
+.suggestions li:first-child { border-top: 0; }
+.suggest-name { flex: 1 1 220px; font-weight: var(--weight-medium); min-width: 0; }
+.suggest-name .kind-line { display: block; font-size: var(--text-sm); color: var(--color-ink-3); font-weight: var(--weight-regular); }
+.suggest-amount { color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+.archived { margin-top: var(--space-4); }
+
+/* Phone: each renewal becomes a card (name across the top, end date and price side by side, actions below). Child
+   selectors only, so the history table inside an open row stays a table. */
+@media (max-width: 767px) {
+  .renewals-table, .renewals-table > tbody, .renewals-table > tbody > tr, .renewals-table > tbody > tr > td,
+  .renewals-table > tbody > tr > th { display: block; }
+  .renewals-table > thead { display: none; }
+  .renewals-table > tbody > tr > td, .renewals-table > tbody > tr > th { height: auto; border-bottom: 0; }
+  .renewals-table > tbody.renewal { border-bottom: 1px solid var(--color-border); padding: var(--space-2) 0; }
+  .renewals-table > tbody.renewal > tr:first-child { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); }
+  .renewals-table > tbody.renewal > tr:first-child > td { padding: 0 var(--space-2); min-width: 0; }
+  .renewals-table > tbody.renewal > tr:first-child > td:first-child, .renewals-table .row-actions { grid-column: 1 / -1; text-align: left; }
+  .renewals-table > tbody.renewal > tr:first-child > td.num:nth-child(4) { grid-column: 1 / -1; text-align: left; }
+  .renewals-table > tbody.renewal > tr:first-child > td.last-empty { display: none; }
+  .renewals-table > tbody > .renew-row > td { padding: var(--space-3) var(--space-2) var(--space-2); }
+  .renewals-table > tbody.is-open, .renewals-table > tbody.is-open td { background: var(--color-surface-tint); }
+  .outcome legend { float: none; width: 100%; margin: 0 0 var(--space-1); }
+  .renew-history table, .renew-history tbody, .renew-history tr, .renew-history td { display: block; }
+  .renew-history thead { display: none; }
+  .renew-history tr { padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+  .renew-history td { display: flex; justify-content: space-between; gap: var(--space-3); height: auto; border: 0; padding: 1px 0; text-align: right; white-space: normal; min-width: 0; }
+  .renew-history td::before { content: attr(data-label); color: var(--color-ink-3); text-align: left; }
+}

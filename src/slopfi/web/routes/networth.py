@@ -1,12 +1,10 @@
 """Net worth: accounts, assets and liabilities, balance snapshots."""
 from __future__ import annotations
 
-from datetime import date as _date
-
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from ... import household, reports, spending_views
+from ... import clock, household, reports, spending_views
 from ..app import Conn, FieldError, _num, redirect, render
 
 router = APIRouter()
@@ -29,7 +27,7 @@ def _networth_page(request: Request, conn, edit: int | None = None, errors=None,
     errors = errors or {}
     dialog_open = bool(editing) or any(k in HOLDING_FIELDS for k in errors) or edit == 0
     return render(request, "networth.html", status_code=status, nw=nw, kinds=kinds, editing=editing, mortgage=mortgage,
-                  today=_date.today().isoformat(), owners=household.owner_choices(conn), errors=errors, form=form or {}, dialog_open=dialog_open,
+                  today=clock.today().isoformat(), owners=household.owner_choices(conn), errors=errors, form=form or {}, dialog_open=dialog_open,
                   updating=updating or any(k.startswith("balance_") for k in errors), fmt=spending_views,
                   stale_days=spending_views.review.STALE_DAYS)
 
@@ -105,7 +103,7 @@ async def save_balances(request: Request, conn: Conn):
         except FieldError as exc:
             errors[exc.field] = exc.message
             continue
-        saved.append((a["id"], posted.get(f"date_{a['id']}") or _date.today().isoformat(), value, a["name"]))
+        saved.append((a["id"], posted.get(f"date_{a['id']}") or clock.today().isoformat(), value, a["name"]))
     if errors:
         return _networth_page(request, conn, errors=errors, form=form, status=400, updating=True)
     for account_id, day, value, _ in saved:

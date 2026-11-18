@@ -14,7 +14,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from .. import db, household, reports, review
+from datetime import date
+
+from .. import clock, db, household, renewals, reports, review, spending_views
 
 BASE = Path(__file__).parent
 app = FastAPI(title="slopFi")
@@ -93,6 +95,7 @@ templates.env.filters["money_whole"] = reports.money_whole
 templates.env.filters["month_label"] = month_label
 templates.env.filters["month_name"] = month_name
 templates.env.filters["pct"] = pct
+templates.env.filters["day_label"] = spending_views.day_label
 
 
 # -------------------------------------------------------------- connection
@@ -152,7 +155,7 @@ class Shell:
     @cached_property
     def checklist(self) -> dict:
         if self.conn is None:
-            return {"month": None, "steps": [], "done": 0, "total": 5, "left": 0, "closed": False, "can_close": False,
+            return {"month": None, "steps": [], "done": 0, "total": 6, "left": 0, "closed": False, "can_close": False,
                     "closed_months": [], "uncategorised_total": 0}
         return review.checklist(self.conn)
 
@@ -168,6 +171,16 @@ class Shell:
     @property
     def review_left(self) -> int:
         return self.checklist["left"]
+
+    @cached_property
+    def renewals_due(self) -> int:
+        """Due renewals not put off to the next close. Counted directly, so it stays visible between closes, when
+        every month is closed and the checklist step has nothing to judge."""
+        if self.conn is None:
+            return 0
+        month = self.checklist["month"]
+        deferred = {r[0] for r in self.conn.execute("SELECT renewal_id FROM deferred_renewals WHERE month = ?", (month,))}
+        return len([r for r in renewals.due(self.conn, clock.today()) if r["id"] not in deferred])
 
 
 def render(request: Request, name: str, status_code: int = 200, **ctx) -> HTMLResponse:
@@ -231,7 +244,7 @@ def health() -> Response:
 
 
 # Routers import the helpers above, so they are included last. Always import the app through this module.
-from .routes import household as household_routes, networth, overview, projection, review as review_routes, setup, spending, transactions  # noqa: E402,I001
+from .routes import household as household_routes, networth, overview, projection, renewals as renewals_routes, review as review_routes, setup, spending, transactions  # noqa: E402,I001
 
-for _mod in (overview, transactions, spending, networth, projection, household_routes, setup, review_routes):
+for _mod in (overview, transactions, spending, networth, projection, household_routes, setup, review_routes, renewals_routes):
     app.include_router(_mod.router)

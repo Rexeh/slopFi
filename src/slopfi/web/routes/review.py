@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from ... import reports, review
+from ... import clock, renewals, reports, review
 from ..app import Conn, month_label, redirect, render
 
 router = APIRouter()
@@ -57,6 +57,24 @@ def unaccept_spike(request: Request, conn: Conn, month: str = Form(...), categor
         return redirect(back, f"{month_label(month, True)} is closed; reopen it to change anything", kind="error")
     review.unaccept_spike(conn, month, category_id)
     return redirect(back, "Acceptance undone", kind="info")
+
+
+@router.post("/review/defer-renewal")
+def defer_renewal(request: Request, conn: Conn, month: str = Form(...), renewal_id: int = Form(...), back: str = Form("")):
+    back = back if back.startswith("/renewals") else f"/review?month={month}#step-renewals"
+    row = renewals.get(conn, renewal_id, clock.today())
+    if row is None:
+        return redirect(back, "That renewal no longer exists", kind="info")
+    review.defer_renewal(conn, month, renewal_id)
+    return redirect(back, f"{row['name']} moved to next close")
+
+
+@router.post("/review/undefer-renewal")
+def undefer_renewal(request: Request, conn: Conn, month: str = Form(...), renewal_id: int = Form(...)):
+    back = f"/review?month={month}#step-renewals"
+    review.undefer_renewal(conn, month, renewal_id)
+    row = renewals.get(conn, renewal_id, clock.today())
+    return redirect(back, f"Undone: {row['name']} is back on this month's list" if row else "Undone", kind="info")
 
 
 @router.post("/review/accept-gap")

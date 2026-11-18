@@ -156,7 +156,7 @@ def test_review_page_steps_and_close_button(db_path):
     client = TestClient(app)
     page = client.get("/review?month=2026-06").text
     assert "<h1>Review · June 2026</h1>" in page and "June is open." in page
-    assert page.count('<li class="step ') == 5 and "File them (2)" in page
+    assert page.count('<li class="step ') == 6 and "File them (2)" in page
     assert 'disabled aria-describedby="close-why-page"' in page and "Enabled once every step is done." in page
     assert 'name="month"' in page and ">Apply</button>" in page
     assert "Reopen" not in page.split("<main")[1]

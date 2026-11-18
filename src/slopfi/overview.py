@@ -12,7 +12,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from . import db, reports, review
+from . import clock, db, reports, review
 
 TYPICAL_N = 3            # months in the typical window
 ABOUT_TYPICAL = 50.0     # a difference under this is "about typical"
@@ -164,7 +164,7 @@ def six_months(conn: sqlite3.Connection, account_id: int | None = None, n: int =
                today: date | None = None) -> list[dict]:
     """The last `n` months, oldest first, each flagged partial (an account has no data for it, or the month is
     still running) and carrying a rolling average of spending over the full months among the last three."""
-    today = today or date.today()
+    today = today or clock.today()
     current = today.strftime("%Y-%m")
     cov = {c["month"]: c for c in reports.month_coverage(conn)}
     base = {m["month"]: m["outgoings"]
@@ -277,7 +277,7 @@ def status_line(checklist: dict, today: date | None = None) -> dict:
 # ------------------------------------------------------------------- page
 def page(conn: sqlite3.Connection, month: str, account_id: int | None = None, today: date | None = None) -> dict:
     """Everything the Overview template needs for one month."""
-    today = today or date.today()
+    today = today or clock.today()
     summary = next((m for m in reports.monthly_summary(conn, account_id=account_id) if m["month"] == month), None)
     typical = typical_summary(conn, month, account_id)
     against = against_typical(conn, month, account_id)

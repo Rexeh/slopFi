@@ -33,3 +33,6 @@ pii.local.txt
 .env
 docker-data/
 test-results/
+
+# impeccable: review screenshots are regenerated, not committed
+.impeccable/review/

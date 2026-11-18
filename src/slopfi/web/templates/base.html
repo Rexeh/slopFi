@@ -20,7 +20,8 @@
 {% set current = {"/recurring": "/spending", "/rules": "/categories"}.get(path, path) %}
 {% set groups = [
   ("Review", [("/review", "review", "Review", shell.review_left, "steps left"),
-              ("/transactions", "transactions", "Transactions", shell.uncategorised, "uncategorised")]),
+              ("/transactions", "transactions", "Transactions", shell.uncategorised, "uncategorised"),
+              ("/renewals", "calendar", "Renewals", shell.renewals_due, "due")]),
   ("Understand", [("/", "overview", "Overview", 0, ""), ("/spending", "spending", "Spending", 0, ""),
                   ("/networth", "net-worth", "Net worth", 0, ""), ("/projection", "projection", "Projection", 0, "")]),
 ] %}

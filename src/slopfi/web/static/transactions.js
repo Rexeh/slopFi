@@ -27,9 +27,10 @@
 
   // ------------------------------------------------------------ current row
   let currentId = null;
-  function current() {
+  // fallback: with no current row, act on the first (c, o, x); moving (j/k/n) passes false so it starts at row one.
+  function current(fallback = true) {
     const active = doc.activeElement && doc.activeElement.closest && doc.activeElement.closest("#txn-table tbody tr");
-    return active || (currentId && doc.getElementById(currentId)) || rows()[0] || null;
+    return active || (currentId && doc.getElementById(currentId)) || (fallback && rows()[0]) || null;
   }
   function focusRow(tr) {
     if (!tr) return;
@@ -40,7 +41,7 @@
     tr.scrollIntoView({ block: "nearest" });
   }
   function move(delta) {
-    const list = rows(), cur = current();
+    const list = rows(), cur = current(false);
     if (!list.length) return;
     const i = Math.max(0, Math.min(list.length - 1, (cur ? list.indexOf(cur) : -1) + delta));
     focusRow(list[i]);
@@ -106,7 +107,7 @@
     box.dispatchEvent(new Event("change", { bubbles: true }));
   }
   function nextUncategorised() {
-    const list = rows(), cur = current();
+    const list = rows(), cur = current(false);
     const from = cur ? list.indexOf(cur) + 1 : 0;
     const next = list.slice(from).find((r) => r.classList.contains("uncat")) || list.find((r) => r.classList.contains("uncat"));
     if (next) { focusRow(next); openEditor(next); }

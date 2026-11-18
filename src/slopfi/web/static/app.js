@@ -14,8 +14,8 @@
     try { localStorage.setItem("sidebar", on ? "rail" : "full"); } catch (e) { /* private mode */ }
     if (!toggle) return;
     toggle.setAttribute("aria-expanded", String(!on));
-    const title = $("title", toggle);
-    if (title) title.textContent = on ? "Expand sidebar" : "Collapse sidebar";
+    const label = on ? "Expand sidebar" : "Collapse sidebar", title = $("title", toggle);
+    if (title) title.textContent = label; $("svg", toggle)?.setAttribute("aria-label", label);   // the name is aria-label
   }
   if (toggle) {
     toggle.addEventListener("click", () => setRail(root.dataset.sidebar !== "rail"));
@@ -176,10 +176,10 @@
         if (p) p.hidden = !on;
       });
       if (opts && opts.focus) tab.focus();
-      if (opts && opts.hash !== false) {
-        const slug = tab.getAttribute("aria-controls").replace(/^panel-/, "");
-        history.replaceState(null, "", "#" + slug);
-      }
+      const slug = tab.getAttribute("aria-controls").replace(/^panel-/, "");
+      if (!opts || opts.hash !== false) history.replaceState(null, "", "#" + slug);   // a click passes no opts
+      // A GET form (Apply on a filter) keeps its action's fragment, so the page comes back on this tab.
+      doc.querySelectorAll("form[method=get]").forEach((f) => { f.action = f.action.split("#")[0] + "#" + slug; });
     }
     function fromHash() {
       const h = location.hash.slice(1);

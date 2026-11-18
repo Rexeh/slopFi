@@ -113,7 +113,7 @@
     {% if levers.rows %}
     <p class="status-line">Drag to cut a category; the chart and milestones follow. Nothing is kept until you choose <b>Save to scenario</b>.</p>
     <form method="post" action="/projection/{{ scenario.id }}/levers" id="levers-form" aria-label="Spending levers">
-      <table class="data levers">
+      <div class="table-scroll"><table class="data levers">
         <thead><tr><th scope="col">Category</th><th scope="col" class="num">Average</th><th scope="col" class="cut">Cut</th><th scope="col" class="num pct">%</th><th scope="col" class="num">Saved</th></tr></thead>
         <tbody>
         {% for r in levers.rows %}
@@ -127,7 +127,7 @@
         {% endfor %}
         </tbody>
         <tfoot><tr><td colspan="4">Total saved a month</td><td class="num pos" id="saved-total">{{ levers.saved_total | money_whole }}</td></tr></tfoot>
-      </table>
+      </table></div>
       <p class="panel-note"><b>Fixed</b> is mostly direct debits, so a cut means switching provider. <b>Flexible</b> changes with habits.</p>
       <p id="lever-status" class="lever-status" role="status"></p>
       <div class="save-bar" id="save-bar" hidden>

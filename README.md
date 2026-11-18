@@ -65,7 +65,11 @@ uv run slopfi apply-rules        # categorise anything still uncategorised
 uv run slopfi rules export rules.local.json     # save every rule as JSON
 uv run slopfi rules import rules.local.json     # add rules from a file (duplicates skipped; --replace to start over)
 uv run pytest                      # tests (real statements are used when present under data/)
+uv run pytest -m ui                # only the browser tests (tests/ui); -m "not ui" skips them
 ```
+
+The browser tests drive Chromium with Playwright against the demo household; run `uv run playwright install chromium`
+once first.
 
 `sources.toml` maps each statement folder to an account (name, owner, kind); copy `sources.example.toml` to start.
 A top-level `rules_file = "rules.local.json"` makes every `sync` import and apply that rules file too. Drop new

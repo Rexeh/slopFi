@@ -54,11 +54,19 @@
         </ul>
         {% elif s.key == 'one_offs' and s.spikes %}
         {#- Each flagged category on its own line, with the figures Review compares and a link to its transactions. -#}
-        <p>{{ 'This category is' if s.spikes | length == 1 else 'These categories are' }} far above typical. Tick <b>One-off</b> on anything that won't repeat (a bonus, an annual bill, a big trip) to keep it out of averages and projections. A category clears once it is back under its limit, not counting one-offs.</p>
+        <p>{{ 'This category is' if s.spikes | length == 1 else 'These categories are' }} far above typical. Tick <b>One-off</b> on anything that won't repeat (a bonus, an annual bill, a big trip) to keep it out of averages and projections. If the spending is real and may happen again, <b>Accept</b> it: it stays in your averages and the month can close.</p>
         <ul class="spikes">
         {% for sp in s.spikes %}
-          <li><span><b>{{ sp.name }}</b> {{ sp.amount | money_whole }} in {{ [c.month] | month_range }} · typical {{ sp.typical | money_whole }} ({{ sp.months | month_range }}) · {{ '%.1f' | format(sp.ratio) }}× <span class="muted">· limit {{ sp.limit | money_whole }}</span></span>
-            <a class="btn-quiet" href="{{ sp.href }}">Check {{ sp.name }}{{ icon('chevron-right', small=True) }}</a></li>
+          <li class="{{ 'is-accepted' if sp.accepted }}"><span><b>{{ sp.name }}</b> {{ sp.amount | money_whole }} in {{ [c.month] | month_range }} · typical {{ sp.typical | money_whole }} ({{ sp.months | month_range }}) · {{ '%.1f' | format(sp.ratio) }}× <span class="muted">· limit {{ sp.limit | money_whole }}{% if sp.accepted_amount is not none and not sp.accepted %} · accepted at {{ sp.accepted_amount | money_whole }}, now higher{% endif %}</span></span>
+            <span class="spike-actions">
+            {% if sp.accepted %}
+              <span class="spike-accepted">{{ icon('check', small=True) }}Accepted as normal</span>
+              {% if not c.closed %}<form method="post" action="/review/unaccept" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><input type="hidden" name="category_id" value="{{ sp.id }}"><button type="submit" class="btn-quiet" aria-label="Undo accepting {{ sp.name }}">Undo</button></form>{% endif %}
+            {% else %}
+              <a class="btn-quiet" href="{{ sp.href }}">Check {{ sp.name }}{{ icon('chevron-right', small=True) }}</a>
+              {% if not c.closed %}<form method="post" action="/review/accept" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><input type="hidden" name="category_id" value="{{ sp.id }}"><button type="submit" class="btn btn-sm" aria-label="Accept {{ sp.name }} as normal for {{ c.month | month_name }}">Accept</button></form>{% endif %}
+            {% endif %}
+            </span></li>
         {% endfor %}
         </ul>
         {% else %}

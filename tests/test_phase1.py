@@ -21,7 +21,7 @@ def _seeded(db_path):
 
 # ------------------------------------------------------------------ schema
 def test_schema_v7_has_closed_months(conn):
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
     assert conn.execute("SELECT COUNT(*) FROM closed_months").fetchone()[0] == 0
 
 
@@ -32,7 +32,7 @@ def test_migration_from_v6_adds_closed_months(tmp_path):
     c.execute("PRAGMA user_version = 6")
     c.close()
     c = db.connect(path)
-    assert c.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert c.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
     assert c.execute("SELECT name FROM sqlite_master WHERE name = 'closed_months'").fetchone()
     c.close()
 

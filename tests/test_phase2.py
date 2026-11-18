@@ -317,3 +317,51 @@ def test_ticking_the_one_off_clears_the_step_and_the_totals_agree(db_path):
     step = next(s for s in review.checklist(conn, "2026-06", today=date(2026, 7, 5))["steps"] if s["key"] == "one_offs")
     assert step["done"] is True
     conn.close()
+
+
+def _one_offs_step(conn):
+    return next(s for s in review.checklist(conn, "2026-06", today=date(2026, 7, 5))["steps"] if s["key"] == "one_offs")
+
+
+def test_accepting_a_spike_clears_the_step_and_undo_brings_it_back(db_path):
+    conn = _spike(db_path)
+    groceries = db.category_id_by_path(conn, "Groceries")
+    conn.close()
+    client = TestClient(app)
+    r = client.post("/review/accept", data={"month": "2026-06", "category_id": groceries}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/review?month=2026-06#step-one_offs"
+    conn = db.connect(db_path)
+    step = _one_offs_step(conn)
+    assert step["done"] is True and step["count"] == "1 accepted" and step["spikes"][0]["accepted"] is True
+    conn.close()
+    html = client.get("/review?month=2026-06").text
+    step_html = html[html.index('id="step-one_offs"'):html.index('id="step-balances"')]
+    assert "Accepted as normal" in step_html and 'action="/review/unaccept"' in step_html
+
+    client.post("/review/unaccept", data={"month": "2026-06", "category_id": groceries})
+    conn = db.connect(db_path)
+    assert _one_offs_step(conn)["done"] is False
+    conn.close()
+
+
+def test_an_accepted_spike_is_flagged_again_when_it_rises(db_path):
+    conn = _spike(db_path)
+    groceries = db.category_id_by_path(conn, "Groceries")
+    review.accept_spike(conn, "2026-06", groceries)
+    importer.import_statement(conn, _statement([ParsedTransaction(date(2026, 6, 25), ")))", ["TESCO STORES 2041"], -50.0)],
+                                               "2026-06-21", "2026-06-30"), "s2.pdf", "hash-s2")
+    step = _one_offs_step(conn)
+    spike = step["spikes"][0]
+    assert step["done"] is False and spike["accepted"] is False and spike["accepted_amount"] == 500
+    conn.close()
+
+
+def test_a_closed_month_refuses_accept(db_path):
+    conn = _spike(db_path)
+    groceries = db.category_id_by_path(conn, "Groceries")
+    review.close_month(conn, "2026-06")
+    conn.close()
+    TestClient(app).post("/review/accept", data={"month": "2026-06", "category_id": groceries})
+    conn = db.connect(db_path)
+    assert conn.execute("SELECT COUNT(*) FROM accepted_spikes").fetchone()[0] == 0
+    conn.close()

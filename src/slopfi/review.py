@@ -107,6 +107,8 @@ def _spikes(conn: sqlite3.Connection, month: str) -> list[dict]:
     for r in rows:
         c = by_cat.setdefault(r["top_id"], {"id": r["top_id"], "name": r["top_name"], "kind": r["kind"], "values": {}})
         c["values"][r["month"]] = abs(r["total"])
+    accepted = {r["category_id"]: r["amount"]
+                for r in conn.execute("SELECT category_id, amount FROM accepted_spikes WHERE month = ?", (month,))}
     out = []
     for c in by_cat.values():
         avg = sum(c["values"].get(m, 0.0) for m in earlier) / len(earlier)
@@ -114,10 +116,28 @@ def _spikes(conn: sqlite3.Connection, month: str) -> list[dict]:
         if avg > 0 and this > SPIKE_FACTOR * avg:
             # Checked on Transactions, largest first: spending is negative, so it ascends; income descends.
             href = f"/transactions?month={month}&category_id={c['id']}&sort=amount&dir={'desc' if c['kind'] == 'income' else 'asc'}"
+            was = accepted.get(c["id"])
             out.append({"id": c["id"], "name": c["name"], "kind": c["kind"], "amount": this, "typical": avg,
-                        "ratio": this / avg, "limit": SPIKE_FACTOR * avg, "months": sorted(earlier), "href": href})
-    out.sort(key=lambda s: -s["ratio"])
+                        "ratio": this / avg, "limit": SPIKE_FACTOR * avg, "months": sorted(earlier), "href": href,
+                        "accepted": was is not None and round(this, 2) <= round(was, 2),
+                        "accepted_amount": was})   # set but not `accepted`: it has risen since, so flagged again
+    out.sort(key=lambda s: (s["accepted"], -s["ratio"]))   # still to check first
     return out
+
+
+def accept_spike(conn: sqlite3.Connection, month: str, category_id: int) -> dict | None:
+    """Accept a flagged category's month as normal at its current total. Returns the spike, or None if not flagged."""
+    spike = next((s for s in _spikes(conn, month) if s["id"] == category_id), None)
+    if spike:
+        with conn:
+            conn.execute("INSERT OR REPLACE INTO accepted_spikes (month, category_id, amount, accepted_at) VALUES (?, ?, ?, ?)",
+                         (month, category_id, spike["amount"], now_iso()))
+    return spike
+
+
+def unaccept_spike(conn: sqlite3.Connection, month: str, category_id: int) -> None:
+    with conn:
+        conn.execute("DELETE FROM accepted_spikes WHERE month = ? AND category_id = ?", (month, category_id))
 
 
 def _stale_accounts(conn: sqlite3.Connection, today: date) -> list[dict]:
@@ -158,6 +178,7 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
     uncat_n = summary["uncategorised_count"] if summary else 0
     uncat_amount = summary["uncategorised_amount"] if summary else 0.0
     spikes = _spikes(conn, month)
+    to_check = [s for s in spikes if not s["accepted"]]
     stale = _stale_accounts(conn, today)
     over = _over_target(conn, month)
     has_targets = bool(reports.budgets(conn))
@@ -171,11 +192,11 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
          "href": f"/transactions?month={month}&uncategorised=1", "action": f"File them ({uncat_n})" if uncat_n else "Open",
          "detail": f"{uncat_n} transactions still to categorise ({reports.money_whole(uncat_amount)})." if uncat_n
                    else "Everything is filed.", "amount": uncat_amount},
-        {"key": "one_offs", "title": "One-offs checked", "done": not spikes,
-         "count": f"{len(spikes)} to check" if spikes else "0",
+        {"key": "one_offs", "title": "One-offs checked", "done": not to_check,
+         "count": f"{len(to_check)} to check" if to_check else (f"{len(spikes)} accepted" if spikes else "0"),
          "href": f"/review?month={month}#step-one_offs", "action": "Check",
-         "detail": "; ".join(f"{s['name']} {reports.money_whole(s['amount'])} is {s['ratio']:.1f}× typical" for s in spikes)
-                   if spikes else "No category is far above its usual level.", "spikes": spikes},
+         "detail": "; ".join(f"{s['name']} {reports.money_whole(s['amount'])} is {s['ratio']:.1f}× typical" for s in to_check)
+                   if to_check else "No category is far above its usual level.", "spikes": spikes},
         {"key": "balances", "title": "Update balances", "done": not stale,
          "count": f"{len(stale)} stale" if stale else "0", "href": "/networth",
          "action": f"Update ({len(stale)} stale)" if stale else "Open",

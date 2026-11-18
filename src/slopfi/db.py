@@ -165,6 +165,14 @@ CREATE TABLE IF NOT EXISTS closed_months (
     month     TEXT PRIMARY KEY,          -- 'YYYY-MM'; a month the household has finished reviewing
     closed_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS accepted_spikes (
+    month       TEXT NOT NULL,          -- 'YYYY-MM'
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,   -- top-level category
+    amount      REAL NOT NULL,          -- the month's total when accepted; above this it is flagged again
+    accepted_at TEXT NOT NULL,
+    PRIMARY KEY (month, category_id)
+);
 """
 
 # Applied in order to databases created at an earlier SCHEMA_VERSION. New tables come from SCHEMA.
@@ -186,6 +194,7 @@ MIGRATIONS: dict[int, list] = {
         _add_column("scenarios", "surplus_target", "TEXT"),
         _add_column("scenarios", "category_savings", "TEXT NOT NULL DEFAULT '{}'")],
     7: [],   # closed_months: new table only
+    8: [],   # accepted_spikes: new table only
 }
 
 
@@ -224,7 +233,7 @@ def connect(path: str | os.PathLike | None = None) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 def init_db(conn: sqlite3.Connection) -> None:

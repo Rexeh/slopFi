@@ -39,6 +39,26 @@ def close_month(request: Request, conn: Conn, month: str = Form(...)):
     return redirect(f"/review?month={month}", f"{label} closed")
 
 
+@router.post("/review/accept")
+def accept_spike(request: Request, conn: Conn, month: str = Form(...), category_id: int = Form(...)):
+    back = f"/review?month={month}#step-one_offs"
+    if month in review.closed_months(conn):
+        return redirect(back, f"{month_label(month, True)} is closed; reopen it to change anything", kind="error")
+    spike = review.accept_spike(conn, month, category_id)
+    if not spike:
+        return redirect(back, "That category is no longer far above typical", kind="info")
+    return redirect(back, f"{spike['name']} accepted as normal for {month_label(month, True)}")
+
+
+@router.post("/review/unaccept")
+def unaccept_spike(request: Request, conn: Conn, month: str = Form(...), category_id: int = Form(...)):
+    back = f"/review?month={month}#step-one_offs"
+    if month in review.closed_months(conn):
+        return redirect(back, f"{month_label(month, True)} is closed; reopen it to change anything", kind="error")
+    review.unaccept_spike(conn, month, category_id)
+    return redirect(back, "Acceptance undone", kind="info")
+
+
 @router.post("/review/reopen")
 def reopen_month(request: Request, conn: Conn, month: str = Form(...)):
     review.reopen_month(conn, month)

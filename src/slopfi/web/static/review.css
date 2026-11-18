@@ -15,6 +15,10 @@
 .spikes li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-1) 0; border-top: 1px solid var(--color-border); font-size: var(--text-table); font-variant-numeric: tabular-nums; }
 .spikes li:first-child { border-top: 0; }
 .spikes .btn-quiet { white-space: nowrap; gap: var(--space-1); }
+.spike-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
+.spike-actions a.btn-quiet { display: inline-flex; align-items: center; }   /* a link's 32px min-height otherwise leaves its text at the top */
+.spikes li.is-accepted > span:first-child { color: var(--color-ink-3); }
+.spike-accepted { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-positive); white-space: nowrap; }
 .step-body:has(.spikes):last-child { grid-column: 2 / -1; }   /* one-offs: no step action, each line has its own */
 .step-action .icon { transition: transform var(--duration-fast) var(--ease-enter); }
 .step-action:hover .icon { transform: translateX(2px); }

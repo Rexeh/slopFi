@@ -262,6 +262,18 @@ def rename_category(conn: Conn, cat_id: int, name: str = Form(...)):
     return redirect("/categories", f"Renamed to {name}")
 
 
+@router.post("/categories/{cat_id}/spread")
+def spread_category(conn: Conn, cat_id: int, spread: str = Form("0")):
+    on = spread == "1"
+    with conn:
+        cur = conn.execute("UPDATE categories SET spread = ? WHERE id = ? AND kind = 'expense'", (int(on), cat_id))
+    if not cur.rowcount:
+        return redirect("/categories", "Only spending categories can be spread", kind="error")
+    name = conn.execute("SELECT name FROM categories WHERE id = ?", (cat_id,)).fetchone()["name"]
+    return redirect(f"/categories#cat-{cat_id}",
+                    f"{name} is spread over 12 months in trends" if on else f"{name} shows month by month again")
+
+
 @router.post("/categories/{cat_id}/delete")
 def delete_category(conn: Conn, cat_id: int):
     row = conn.execute(

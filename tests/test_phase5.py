@@ -112,6 +112,22 @@ def test_category_delete_blocked_when_in_use_and_rename(db_path):
     assert "Animals deleted" in _flash(r)
 
 
+def test_category_spread_toggle(db_path):
+    conn = _seeded(db_path)
+    groceries = db.category_id_by_path(conn, "Groceries")
+    salary = db.category_id_by_path(conn, "Income/Salary")
+    conn.close()
+    client = TestClient(app)
+    r = client.post(f"/categories/{groceries}/spread", data={"spread": "1"}, follow_redirects=False)
+    assert "Groceries is spread over 12 months" in _flash(r)
+    assert "Spread over 12 months" in client.get("/categories").text
+    r = client.post(f"/categories/{salary}/spread", data={"spread": "1"}, follow_redirects=False)
+    assert "Only spending categories can be spread" in _flash(r)
+    r = client.post(f"/categories/{groceries}/spread", data={"spread": "0"}, follow_redirects=False)
+    assert "month by month again" in _flash(r)
+    assert db.connect(db_path).execute("SELECT spread FROM categories WHERE id = ?", (groceries,)).fetchone()[0] == 0
+
+
 def test_rule_switch_swaps_row_and_toasts(db_path):
     _seeded(db_path).close()
     client = TestClient(app)

@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import date
 
 import pytest
 
@@ -87,6 +88,38 @@ def test_trend_table_and_one_off(trend_db):
     assert "Transport" not in {c["name"] for c in table["categories"]}
     table = reports.trend_table(trend_db, months, exclude_one_off=False)
     assert "Transport" in {c["name"] for c in table["categories"]}
+
+
+def test_spread_category(trend_db):
+    from slopfi import overview, review
+    months = ["2026-04", "2026-05", "2026-06"]
+    importer.import_statement(trend_db, _stmt("2026-04-01", "2026-04-30", [_t("2026-04-20", "MOTORCARE EXAMPLETOWN", -50.0, "VIS")],
+                                              identifier="99-10-22 12341022"), "c.pdf", "h3")
+    assert any(s["name"] == "Transport" for s in review._spikes(trend_db, "2026-05"))   # 900 against 50/3
+    trend_db.execute("UPDATE categories SET spread = 1 WHERE id = ?", (db.category_id_by_path(trend_db, "Transport/Car maintenance"),))
+
+    # 50 in April and 900 in May, averaged over the months with data in the 12 ending each: Jan–Apr (4), –May (5), –Jun (6)
+    cats = {c["name"]: c for c in reports.trend_table(trend_db, months)["categories"]}
+    assert cats["Transport"]["series"] == pytest.approx([12.5, 190.0, 950 / 6]) and not cats["Transport"]["lumpy"]
+    actual = {m["month"]: m["outgoings"] for m in reports.monthly_summary(trend_db)}
+    spread = {m["month"]: m["outgoings"] for m in reports.monthly_summary(trend_db, spread=True)}
+    assert spread["2026-05"] == pytest.approx(actual["2026-05"] - 900 + 190)
+    assert spread["2026-06"] == pytest.approx(actual["2026-06"] + 950 / 6)
+    assert not any(s["name"] == "Transport" for s in review._spikes(trend_db, "2026-05"))
+    # the Overview: the month itself is actual spend, typical (Mar–May for June) is the spread baseline
+    against = overview.against_typical(trend_db, "2026-06")
+    transport = next(r for r in against["rows"] if r["name"] == "Transport")
+    assert transport["spend"] == 0.0 and transport["typical"] == pytest.approx((0 + 12.5 + 190) / 3)
+
+
+def test_overview_typical_leaves_out_one_offs(trend_db):
+    from slopfi import overview
+    txn = trend_db.execute("SELECT id FROM transactions WHERE description LIKE 'MOTORCARE%'").fetchone()[0]
+    before = overview.typical_summary(trend_db, "2026-06")["spending"]
+    reports.set_one_off(trend_db, txn, True)
+    assert overview.typical_summary(trend_db, "2026-06")["spending"] == pytest.approx(before - 300)   # 900 over 3 months
+    may = next(r for r in overview.six_months(trend_db, today=date(2026, 7, 15)) if r["month"] == "2026-05")
+    assert may["outgoings"] == next(m["outgoings"] for m in reports.monthly_summary(trend_db) if m["month"] == "2026-05")
 
 
 def test_budgets_and_opportunities(trend_db):

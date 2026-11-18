@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS categories (
     name       TEXT NOT NULL,
     parent_id  INTEGER REFERENCES categories(id) ON DELETE CASCADE,
     kind       TEXT NOT NULL CHECK (kind IN ('expense', 'income', 'transfer')),
-    sort_order INTEGER NOT NULL DEFAULT 0
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    spread     INTEGER NOT NULL DEFAULT 0   -- 1: trends use a 12-month average (holidays, annual bills)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS categories_name_parent
     ON categories (name, COALESCE(parent_id, 0));
@@ -202,6 +203,7 @@ MIGRATIONS: dict[int, list] = {
         _add_column("scenarios", "category_savings", "TEXT NOT NULL DEFAULT '{}'")],
     7: [],   # closed_months: new table only
     8: [],   # accepted_spikes, accepted_gaps: new tables only
+    9: [_add_column("categories", "spread", "INTEGER NOT NULL DEFAULT 0")],
 }
 
 
@@ -240,7 +242,7 @@ def connect(path: str | os.PathLike | None = None) -> sqlite3.Connection:
     return conn
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 def init_db(conn: sqlite3.Connection) -> None:

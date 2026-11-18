@@ -43,8 +43,10 @@ def _account_filter(account_id: int | None) -> tuple[str, list]:
     return "", []
 
 
-def monthly_summary(conn: sqlite3.Connection, account_id: int | None = None, exclude_one_off: bool = False) -> list[dict]:
-    """Per calendar month: outgoings, income, transfers, uncategorised (transfers excluded from net)."""
+def monthly_summary(conn: sqlite3.Connection, account_id: int | None = None, exclude_one_off: bool = False,
+                    spread: bool = False) -> list[dict]:
+    """Per calendar month: outgoings, income, transfers, uncategorised (transfers excluded from net).
+    spread: outgoings carry spread categories at their 12-month average instead of what was spent that month."""
     aclause, aparams = _account_filter(account_id)
     if exclude_one_off:
         aclause += " AND t.one_off = 0"
@@ -82,6 +84,9 @@ def monthly_summary(conn: sqlite3.Connection, account_id: int | None = None, exc
         if r["uncategorised"]:
             m["uncategorised_amount"] += abs(r["total"])
             m["uncategorised_count"] += r["n"]
+    if spread:
+        for month, _top_id, _top_name, delta in _spread_deltas(conn, sorted(months), account_id, exclude_one_off):
+            months[month]["outgoings"] += delta
     for m in months.values():
         m["net"] = m["income"] - m["outgoings"]
     return [months[k] for k in sorted(months)]
@@ -366,13 +371,17 @@ def trend_months(conn: sqlite3.Connection, n: int, include_partial: bool = True)
     return chosen, [c for c in cov if c["month"] in chosen]
 
 
-def _spend_by_category_month(conn, months, account_id, exclude_one_off):
+SPREAD_N = 12   # months a spread category's spend is averaged over
+SPREAD_SQL = "(COALESCE(c.spread, 0) = 1 OR COALESCE(p.spread, 0) = 1)"   # a sub-category follows a spread parent
+
+
+def _spend_query(conn, months, account_id, exclude_one_off) -> list[dict]:
     if not months:
         return []
     aclause, aparams = _account_filter(account_id)
     one_off = "AND t.one_off = 0" if exclude_one_off else ""
     placeholders = ",".join("?" * len(months))
-    return conn.execute(
+    rows = conn.execute(
         f"""
         SELECT substr(t.date, 1, 7) AS month,
                COALESCE(p.id, c.id) AS top_id, COALESCE(p.name, c.name, 'Uncategorised') AS top_name,
@@ -380,7 +389,7 @@ def _spend_by_category_month(conn, months, account_id, exclude_one_off):
                CASE WHEN p.id IS NULL THEN NULL ELSE c.name END AS sub_name,
                SUM(-t.amount) AS spend,
                SUM(CASE WHEN t.type_code IN ('DD', 'SO') THEN -t.amount ELSE 0 END) AS fixed,
-               COUNT(*) AS n
+               COUNT(*) AS n, MAX({SPREAD_SQL}) AS spread
         FROM transactions t {CATEGORY_JOIN}
         WHERE (c.kind = 'expense' OR t.category_id IS NULL) AND substr(t.date, 1, 7) IN ({placeholders})
               {aclause} {one_off}
@@ -388,6 +397,54 @@ def _spend_by_category_month(conn, months, account_id, exclude_one_off):
         """,
         [*months, *aparams],
     ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _month_add(month: str, k: int) -> str:
+    y, m = divmod(int(month[:4]) * 12 + int(month[5:7]) - 1 + k, 12)
+    return f"{y:04d}-{m + 1:02d}"
+
+
+def _spread_rows(conn, months, account_id, exclude_one_off) -> list[dict]:
+    """Spend rows for spread categories, each month's spend replaced by the average over the months with data
+    among the SPREAD_N ending there. n stays the month's own transaction count."""
+    if not months:
+        return []
+    have = months_available(conn)
+    # shortcut: with under 12 months of history the average is over the months there are, so a holiday in a
+    # short history reads high until a full year has been imported.
+    windows = {m: [x for x in have if _month_add(m, 1 - SPREAD_N) <= x <= m] for m in months}
+    raw = [r for r in _spend_query(conn, sorted({x for w in windows.values() for x in w}), account_id, exclude_one_off)
+           if r["spread"]]
+    by_key: dict = {}
+    for r in raw:
+        by_key.setdefault((r["top_id"], r["sub_id"]), []).append(r)
+    out = []
+    for rs in by_key.values():
+        for m in months:
+            inside = [r for r in rs if r["month"] in windows[m]]
+            if not inside:
+                continue
+            n = len(windows[m])
+            out.append({**rs[0], "month": m, "spend": sum(r["spend"] for r in inside) / n,
+                        "fixed": sum(r["fixed"] for r in inside) / n, "n": sum(r["n"] for r in inside if r["month"] == m)})
+    return out
+
+
+def _spread_deltas(conn, months, account_id, exclude_one_off) -> list[tuple]:
+    """(month, top_id, top_name, delta): add delta to a month's actual spend to carry spread categories at their average."""
+    actual = [(r["month"], r["top_id"], r["top_name"], -r["spend"])
+              for r in _spend_query(conn, months, account_id, exclude_one_off) if r["spread"]]
+    return actual + [(r["month"], r["top_id"], r["top_name"], r["spend"])
+                     for r in _spread_rows(conn, months, account_id, exclude_one_off)]
+
+
+def _spend_by_category_month(conn, months, account_id, exclude_one_off, spread: bool = True):
+    """Spend per (month, top, sub) category; spread categories at their 12-month average unless spread=False."""
+    rows = _spend_query(conn, months, account_id, exclude_one_off)
+    if not spread:
+        return rows
+    return [r for r in rows if not r["spread"]] + _spread_rows(conn, months, account_id, exclude_one_off)
 
 
 def _series(rows, months, key):
@@ -460,7 +517,7 @@ def trend_table(conn: sqlite3.Connection, months: list[str], account_id: int | N
         })
     categories.sort(key=lambda c: -c["avg"])
 
-    summary = {m: s for m, s in ((x["month"], x) for x in monthly_summary(conn, account_id=account_id, exclude_one_off=exclude_one_off)) if m in months}
+    summary = {m: s for m, s in ((x["month"], x) for x in monthly_summary(conn, account_id=account_id, exclude_one_off=exclude_one_off, spread=True)) if m in months}
     totals = {
         "months": months,
         "outgoings": [summary.get(m, {}).get("outgoings", 0.0) for m in months],

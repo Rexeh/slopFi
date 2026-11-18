@@ -116,7 +116,8 @@ def awaiting_months(conn: sqlite3.Connection) -> set[str]:
 
 def _spikes(conn: sqlite3.Connection, month: str) -> list[dict]:
     """Top-level categories (and income) whose month, with one-offs removed, is over SPIKE_FACTOR × the
-    average of the previous three months. Marking the odd transaction one-off clears the spike."""
+    average of the previous three months. Marking the odd transaction one-off clears the spike. Spread
+    categories are left out: their lumps are expected."""
     earlier = [m for m in reports.months_available(conn) if m < month][:3]
     if not earlier:
         return []
@@ -127,6 +128,7 @@ def _spikes(conn: sqlite3.Connection, month: str) -> list[dict]:
                    substr(t.date, 1, 7) AS month, SUM(t.amount) AS total
             FROM transactions t {reports.CATEGORY_JOIN}
             WHERE t.one_off = 0 AND t.category_id IS NOT NULL AND c.kind IN ('expense', 'income')
+              AND NOT {reports.SPREAD_SQL}
               AND substr(t.date, 1, 7) IN ({placeholders})
             GROUP BY top_id, month""",
         months,

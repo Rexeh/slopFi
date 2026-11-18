@@ -22,11 +22,17 @@
   <div class="panel-head"><h2>All categories</h2><div class="tools"><button type="button" class="btn btn-primary" data-dialog="#add-category">{{ icon('plus') }}Add a category</button></div></div>
   <div class="table-scroll">
   <table class="data categories">
-    <thead><tr><th scope="col">Category</th><th scope="col">Type</th><th scope="col" class="num">Transactions</th><th scope="col" class="num">Rules</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col">Category</th><th scope="col">Type</th><th scope="col">In trends</th><th scope="col" class="num">Transactions</th><th scope="col" class="num">Rules</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
     <tbody>
     {% for t in tree %}{% for c in [t] + t.children %}
       <tr class="{{ 'top' if c is sameas t else 'sub' }}" id="cat-{{ c.id }}">
         <td>{{ c.name }}</td><td>{{ c.kind_label }}</td>
+        <td>{% if c is not sameas t and t.spread %}Spread over 12 months (from {{ t.name }}){% elif t.kind == 'expense' %}
+          <form method="post" action="/categories/{{ c.id }}/spread" class="inline">
+            <input type="hidden" name="spread" value="{{ 0 if c.spread else 1 }}">
+            {{ 'Spread over 12 months' if c.spread else 'Month by month' }}
+            <button class="btn-quiet" aria-label="Change: {{ 'show ' ~ c.path ~ ' month by month' if c.spread else 'spread ' ~ c.path ~ ' over 12 months' }}">Change</button>
+          </form>{% endif %}</td>
         <td class="num">{% if c.n_txn %}<a href="/transactions?month=all&category_id={{ c.id }}">{{ c.n_txn }}</a>{% else %}0{% endif %}</td>
         <td class="num">{{ c.n_rules }}</td>
         <td class="actions">
@@ -43,20 +49,21 @@
       </tr>
       <tr id="cat-edit-{{ c.id }}" class="is-editing edit-row {{ 'sub' if c is not sameas t }}" hidden>
         <td><label class="field"><span class="visually-hidden">New name for {{ c.path }}</span><input name="name" form="cat-form-{{ c.id }}" value="{{ c.name }}" required class="w-24ch"></label></td>
-        <td>{{ c.kind_label }}</td><td class="num">{{ c.n_txn }}</td><td class="num">{{ c.n_rules }}</td>
+        <td>{{ c.kind_label }}</td><td></td><td class="num">{{ c.n_txn }}</td><td class="num">{{ c.n_rules }}</td>
         <td class="actions">
           <button type="submit" form="cat-form-{{ c.id }}" class="btn btn-sm">Save</button>
           <button type="button" class="btn-quiet" data-cancel="cat-{{ c.id }}">Cancel</button>
         </td>
       </tr>
     {% endfor %}{% else %}
-      <tr><td colspan="5"><div class="empty"><span class="empty-icon">{{ icon('categories') }}</span><h3>No categories yet</h3><p>Add one to start filing transactions.</p></div></td></tr>
+      <tr><td colspan="6"><div class="empty"><span class="empty-icon">{{ icon('categories') }}</span><h3>No categories yet</h3><p>Add one to start filing transactions.</p></div></td></tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
   {% for t in tree %}{% for c in [t] + t.children %}<form id="cat-form-{{ c.id }}" method="post" action="/categories/{{ c.id }}/rename"></form>{% endfor %}{% endfor %}
-  <p class="panel-note">Type is set on the top-level category and shared by its sub-categories. A category in use (transactions, rules or sub-categories) can't be deleted until they are moved or removed.</p>
+  <p class="panel-note">Type is set on the top-level category and shared by its sub-categories. A category in use (transactions, rules or sub-categories) can't be deleted until they are moved or removed.
+    Spread a spending category that comes in lumps (holidays, annual bills): trends, typical months and the projection use its average over the last 12 months, and Review stops flagging its spikes. Transactions and each month's own total still show what was spent.</p>
 </section>
 </div>
 

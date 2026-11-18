@@ -4,6 +4,8 @@ largest payments, net worth since the last snapshot, the house-move fund target 
 "Typical" has one definition everywhere on the page: the average of the three months with data immediately
 before the selected month (Jun–Aug for September). Spending uses the same rule as monthly_summary's outgoings
 (expense categories, refunds netted off, plus uncategorised debits) so the tile equals the table to the pound.
+A month's own figures are what was spent; baselines (typical, the rolling average) match the Spending page:
+one-offs left out and spread categories at their 12-month average.
 """
 from __future__ import annotations
 
@@ -81,11 +83,15 @@ def typical_months(conn: sqlite3.Connection, month: str) -> list[str]:
     return sorted(m for m in reports.months_available(conn) if m < month)[-TYPICAL_N:]
 
 
-def spending_by_category(conn: sqlite3.Connection, months: list[str], account_id: int | None = None) -> dict:
-    """Spending per top-level category summed over `months`: {top_id|None: {id, name, spend, n}}."""
+def spending_by_category(conn: sqlite3.Connection, months: list[str], account_id: int | None = None,
+                         baseline: bool = False) -> dict:
+    """Spending per top-level category summed over `months`: {top_id|None: {id, name, spend, n}}.
+    baseline: one-offs left out and spread categories at their 12-month average, as on the Spending page."""
     if not months:
         return {}
     aclause, aparams = reports._account_filter(account_id)
+    if baseline:
+        aclause += " AND t.one_off = 0"
     rows = conn.execute(
         f"""
         SELECT COALESCE(p.id, c.id) AS top_id, COALESCE(p.name, c.name, 'Uncategorised') AS name,
@@ -96,14 +102,18 @@ def spending_by_category(conn: sqlite3.Connection, months: list[str], account_id
         """,
         [*months, *aparams],
     ).fetchall()
-    return {r["top_id"]: {"id": r["top_id"], "name": r["name"], "spend": r["spend"], "n": r["n"]} for r in rows}
+    out = {r["top_id"]: {"id": r["top_id"], "name": r["name"], "spend": r["spend"], "n": r["n"]} for r in rows}
+    if baseline:
+        for _month, top_id, name, delta in reports._spread_deltas(conn, months, account_id, exclude_one_off=True):
+            out.setdefault(top_id, {"id": top_id, "name": name, "spend": 0.0, "n": 0})["spend"] += delta
+    return out
 
 
 def against_typical(conn: sqlite3.Connection, month: str, account_id: int | None = None) -> dict:
     """Rows for the "Against typical" table and the "Where <month> went" chart, plus totals."""
     typ_months = typical_months(conn, month)
     this = spending_by_category(conn, [month], account_id)
-    typ = spending_by_category(conn, typ_months, account_id)
+    typ = spending_by_category(conn, typ_months, account_id, baseline=True)
     n = len(typ_months)
     rows = []
     for key in set(this) | set(typ):
@@ -134,7 +144,8 @@ def typical_summary(conn: sqlite3.Connection, month: str, account_id: int | None
     typ_months = typical_months(conn, month)
     if not typ_months:
         return None
-    rows = [m for m in reports.monthly_summary(conn, account_id=account_id) if m["month"] in typ_months]
+    rows = [m for m in reports.monthly_summary(conn, account_id=account_id, exclude_one_off=True, spread=True)
+            if m["month"] in typ_months]
     n = len(typ_months)
     spending = sum(m["outgoings"] for m in rows) / n
     income = sum(m["income"] for m in rows) / n
@@ -156,6 +167,8 @@ def six_months(conn: sqlite3.Connection, account_id: int | None = None, n: int =
     today = today or date.today()
     current = today.strftime("%Y-%m")
     cov = {c["month"]: c for c in reports.month_coverage(conn)}
+    base = {m["month"]: m["outgoings"]
+            for m in reports.monthly_summary(conn, account_id=account_id, exclude_one_off=True, spread=True)}
     out = []
     for m in reports.monthly_summary(conn, account_id=account_id)[-n:]:
         partial = m["month"] >= current or not cov.get(m["month"], {}).get("covered", True)
@@ -163,7 +176,7 @@ def six_months(conn: sqlite3.Connection, account_id: int | None = None, n: int =
     for i, row in enumerate(out):
         if row["partial"]:
             continue
-        window = [r["outgoings"] for r in out[max(0, i - ROLLING_N + 1):i + 1] if not r["partial"]]
+        window = [base[r["month"]] for r in out[max(0, i - ROLLING_N + 1):i + 1] if not r["partial"]]
         if len(window) >= MIN_ROLLING:
             row["avg3"] = sum(window) / len(window)
     return out

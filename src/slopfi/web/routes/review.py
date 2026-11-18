@@ -59,6 +59,26 @@ def unaccept_spike(request: Request, conn: Conn, month: str = Form(...), categor
     return redirect(back, "Acceptance undone", kind="info")
 
 
+@router.post("/review/accept-gap")
+def accept_gap(request: Request, conn: Conn, month: str = Form(...), account_id: int = Form(...)):
+    back = f"/review?month={month}#step-statements"
+    if month in review.closed_months(conn):
+        return redirect(back, f"{month_label(month, True)} is closed; reopen it to change anything", kind="error")
+    gap = review.accept_gap(conn, month, account_id)
+    if not gap:
+        return redirect(back, "Only a gap at the end of the month can wait for the next statement", kind="info")
+    return redirect(back, f"{gap['name']}: {gap['needed']} will come with the next statement")
+
+
+@router.post("/review/unaccept-gap")
+def unaccept_gap(request: Request, conn: Conn, month: str = Form(...), account_id: int = Form(...)):
+    back = f"/review?month={month}#step-statements"
+    if month in review.closed_months(conn):
+        return redirect(back, f"{month_label(month, True)} is closed; reopen it to change anything", kind="error")
+    review.unaccept_gap(conn, month, account_id)
+    return redirect(back, "Undone", kind="info")
+
+
 @router.post("/review/reopen")
 def reopen_month(request: Request, conn: Conn, month: str = Form(...)):
     review.reopen_month(conn, month)

@@ -365,3 +365,58 @@ def test_a_closed_month_refuses_accept(db_path):
     conn = db.connect(db_path)
     assert conn.execute("SELECT COUNT(*) FROM accepted_spikes").fetchone()[0] == 0
     conn.close()
+
+
+# --------------------------------------------------------- waiting on a statement
+def _cycle(db_path, end="2026-06-25"):
+    """A joint account whose statements run to the 25th: June is short of 26–30 Jun until July's arrives."""
+    conn = db.connect(db_path)
+    add_rules(conn, RULES)
+    txns = [ParsedTransaction(date(2026, mo, 3), ")))", ["TESCO STORES 2041"], -100.0) for mo in (3, 4, 5, 6)]
+    importer.import_statement(conn, _statement(txns, "2026-03-01", end), "s.pdf", "hash-s")
+    return conn
+
+
+def _statements_step(conn):
+    return next(s for s in review.checklist(conn, "2026-06", today=date(2026, 7, 5))["steps"] if s["key"] == "statements")
+
+
+def test_closing_without_the_last_days_then_the_next_statement_fills_them(db_path):
+    from slopfi import spending_views
+    conn = _cycle(db_path)
+    acct = _statements_step(conn)["gaps"][0]["id"]
+    conn.close()
+    client = TestClient(app)
+    html = client.get("/review?month=2026-06").text
+    assert "Close without 26–30 Jun" in html
+    r = client.post("/review/accept-gap", data={"month": "2026-06", "account_id": acct}, follow_redirects=False)
+    assert r.headers["location"] == "/review?month=2026-06#step-statements"
+    conn = db.connect(db_path)
+    step = _statements_step(conn)
+    assert step["done"] is True and step["gaps"][0]["accepted"] is True
+    review.close_month(conn, "2026-06")
+    # closed, but still partial in Spending until July's statement arrives
+    assert "2026-06" not in spending_views.period_months(conn, 12, include_partial=False)[0]
+    importer.import_statement(conn, _statement([], "2026-06-26", "2026-07-25"), "s2.pdf", "hash-s2")
+    assert "2026-06" in spending_views.period_months(conn, 12, include_partial=False)[0]
+    conn.close()
+
+
+def test_undo_puts_the_gap_back(db_path):
+    conn = _cycle(db_path)
+    acct = _statements_step(conn)["gaps"][0]["id"]
+    review.accept_gap(conn, "2026-06", acct)
+    review.unaccept_gap(conn, "2026-06", acct)
+    assert _statements_step(conn)["done"] is False
+    conn.close()
+
+
+def test_a_gap_at_the_start_of_the_month_cannot_be_waved_through(db_path):
+    conn = db.connect(db_path)
+    add_rules(conn, RULES)
+    txns = [ParsedTransaction(date(2026, mo, 20), ")))", ["TESCO STORES 2041"], -100.0) for mo in (3, 4, 5, 6)]
+    importer.import_statement(conn, _statement(txns, "2026-03-01", "2026-05-31"), "a.pdf", "hash-a")
+    importer.import_statement(conn, _statement([], "2026-06-10", "2026-06-30", ident=CARD_ID, name="Card"), "b.pdf", "hash-b")
+    gap = next(g for g in _statements_step(conn)["gaps"] if g["needed"] == "1–9 Jun")
+    assert gap["awaiting"] is False and review.accept_gap(conn, "2026-06", gap["id"]) is None
+    conn.close()

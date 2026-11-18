@@ -46,8 +46,8 @@
 <dl class="dl-inline scope" aria-label="Coverage">
   <div><dt>Period</dt><dd>{{ view.scope.period }}</dd></div>
   <div><dt>Gaps</dt><dd>
-    {% for c in view.scope.gaps %}{{ c.month | month_label }} {% if c.closed %}<span class="badge">Closed</span>{% else %}<span class="badge badge-warning">Partial</span>{% endif %} {{ (c.gaps + c.missing) | join(', ') }}{{ '; ' if not loop.last }}{% else %}None{% endfor %}
-    {% if view.scope.gaps and not (view.scope.gaps | selectattr('closed') | list | length == view.scope.gaps | length) %}<a href="/review">Close the month on Review</a>{% endif %}
+    {% for c in view.scope.gaps %}{{ c.month | month_label }} {% if c.closed %}<span class="badge">Closed</span>{% elif c.awaiting %}<span class="badge badge-warning">Partial</span> next statement due:{% else %}<span class="badge badge-warning">Partial</span>{% endif %} {{ (c.gaps + c.missing) | join(', ') }}{{ '; ' if not loop.last }}{% else %}None{% endfor %}
+    {% if view.scope.gaps | rejectattr('closed') | rejectattr('awaiting') | list %}<a href="/review">Close the month on Review</a>{% endif %}
   </dd></div>
   <div><dt>Compared with</dt><dd>{{ view.scope.compared }}{% if view.scope.compared_short %} ({{ t.prev_months | length }} month{{ 's' if t.prev_months | length != 1 }} only){% endif %}</dd></div>
 </dl>

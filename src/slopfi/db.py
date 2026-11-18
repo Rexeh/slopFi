@@ -173,6 +173,13 @@ CREATE TABLE IF NOT EXISTS accepted_spikes (
     accepted_at TEXT NOT NULL,
     PRIMARY KEY (month, category_id)
 );
+
+CREATE TABLE IF NOT EXISTS accepted_gaps (
+    month       TEXT NOT NULL,          -- 'YYYY-MM'; the account's next statement will cover the rest of it
+    account_id  INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    accepted_at TEXT NOT NULL,
+    PRIMARY KEY (month, account_id)
+);
 """
 
 # Applied in order to databases created at an earlier SCHEMA_VERSION. New tables come from SCHEMA.
@@ -194,7 +201,7 @@ MIGRATIONS: dict[int, list] = {
         _add_column("scenarios", "surplus_target", "TEXT"),
         _add_column("scenarios", "category_savings", "TEXT NOT NULL DEFAULT '{}'")],
     7: [],   # closed_months: new table only
-    8: [],   # accepted_spikes: new table only
+    8: [],   # accepted_spikes, accepted_gaps: new tables only
 }
 
 

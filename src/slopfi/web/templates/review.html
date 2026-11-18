@@ -46,10 +46,18 @@
         <h3>{{ s.title }}</h3>
         {% if s.key == 'statements' and s.gaps %}
         {#- Each account short of the month on its own line: what is imported and the dates still to import. -#}
-        <p>Every account needs statements covering all of {{ c.month | month_name }}. Import the missing dates on Statements; if a bank's next statement isn't out yet, the step clears once it is imported.</p>
+        <p>Every account needs statements covering all of {{ c.month | month_name }}. Import the missing dates on Statements. If a bank's next statement isn't out yet, choose <b>Close without</b> those days: {{ c.month | month_name }} stays partial in Spending until that statement is imported.</p>
         <ul class="spikes">
         {% for g in s.gaps %}
-          <li><span><b>{{ g.name }}</b> {{ g.imported }} · <b>{{ g.needed }}</b> still to import</span></li>
+          <li class="{{ 'is-accepted' if g.accepted }}"><span><b>{{ g.name }}</b> {{ g.imported }} · <b>{{ g.needed }}</b> {{ 'comes with the next statement' if g.accepted else 'still to import' }}</span>
+            {% if g.awaiting and not c.closed %}<span class="spike-actions">
+            {% if g.accepted %}
+              <span class="spike-accepted">{{ icon('check', small=True) }}Waiting on next statement</span>
+              <form method="post" action="/review/unaccept-gap" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><input type="hidden" name="account_id" value="{{ g.id }}"><button type="submit" class="btn-quiet" aria-label="Undo closing without {{ g.needed }} for {{ g.name }}">Undo</button></form>
+            {% else %}
+              <form method="post" action="/review/accept-gap" class="inline"><input type="hidden" name="month" value="{{ c.month }}"><input type="hidden" name="account_id" value="{{ g.id }}"><button type="submit" class="btn btn-sm" aria-label="Close {{ c.month | month_name }} without {{ g.needed }} for {{ g.name }}">Close without {{ g.needed }}</button></form>
+            {% endif %}
+            </span>{% elif g.accepted %}<span class="spike-accepted">{{ icon('check', small=True) }}Waiting on next statement</span>{% endif %}</li>
         {% endfor %}
         </ul>
         {% elif s.key == 'one_offs' and s.spikes %}

@@ -63,10 +63,13 @@ def _span(a: date, b: date) -> str:
 
 def coverage_gaps(conn: sqlite3.Connection, month: str) -> list[dict]:
     """One entry per spending account whose statements do not cover the whole month: its name, what is imported
-    ('imported up to 5 Sep'), the dates still needed ('6–30 Sep') and a one-line `text` ('Amex …1005 needs 6–30 Sep')."""
+    ('imported up to 5 Sep'), the dates still needed ('6–30 Sep') and a one-line `text` ('Amex …1005 needs 6–30 Sep').
+    `awaiting`: only the end of the month is missing, so the next statement is not out yet and the gap can be
+    accepted; `accepted`: it has been."""
     y, mo = int(month[:4]), int(month[5:7])
     start, end = date(y, mo, 1), date(y, mo, calendar.monthrange(y, mo)[1])
     day = timedelta(days=1)
+    accepted = {r[0] for r in conn.execute("SELECT account_id FROM accepted_gaps WHERE month = ?", (month,))}
     out = []
     for a in reports.coverage(conn):
         if a["kind"] == "savings":
@@ -82,8 +85,33 @@ def coverage_gaps(conn: sqlite3.Connection, month: str) -> list[dict]:
             imported, needed = f"imported up to {_day(last)}", _span(last + day, end)
         else:
             continue
-        out.append({"name": a["name"], "imported": imported, "needed": needed, "text": f"{a['name']} needs {needed}"})
+        awaiting = start <= last < end and first <= start
+        out.append({"id": a["id"], "name": a["name"], "imported": imported, "needed": needed,
+                    "text": f"{a['name']} needs {needed}", "awaiting": awaiting,
+                    "accepted": awaiting and a["id"] in accepted})
     return out
+
+
+def accept_gap(conn: sqlite3.Connection, month: str, account_id: int) -> dict | None:
+    """Close `month` without the account's last few days. Returns the gap, or None if it cannot be accepted:
+    the account is complete, or the gap is not just the end of the month (a statement is probably missing)."""
+    gap = next((g for g in coverage_gaps(conn, month) if g["id"] == account_id and g["awaiting"]), None)
+    if gap:
+        with conn:
+            conn.execute("INSERT OR IGNORE INTO accepted_gaps (month, account_id, accepted_at) VALUES (?, ?, ?)",
+                         (month, account_id, now_iso()))
+    return gap
+
+
+def unaccept_gap(conn: sqlite3.Connection, month: str, account_id: int) -> None:
+    with conn:
+        conn.execute("DELETE FROM accepted_gaps WHERE month = ? AND account_id = ?", (month, account_id))
+
+
+def awaiting_months(conn: sqlite3.Connection) -> set[str]:
+    """Months with an accepted gap that the next statement has not filled yet: still partial, even once closed."""
+    months = {r[0] for r in conn.execute("SELECT DISTINCT month FROM accepted_gaps")}
+    return {m for m in months if any(g["accepted"] for g in coverage_gaps(conn, m))}
 
 
 def _spikes(conn: sqlite3.Connection, month: str) -> list[dict]:
@@ -174,6 +202,7 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
 
     n_accounts = len([a for a in reports.coverage(conn) if a["kind"] != "savings"])
     gaps = coverage_gaps(conn, month)
+    open_gaps = [g for g in gaps if not g["accepted"]]
     summary = next((m for m in reports.monthly_summary(conn) if m["month"] == month), None)
     uncat_n = summary["uncategorised_count"] if summary else 0
     uncat_amount = summary["uncategorised_amount"] if summary else 0.0
@@ -184,9 +213,10 @@ def checklist(conn: sqlite3.Connection, month: str | None = None, today: date | 
     has_targets = bool(reports.budgets(conn))
 
     steps = [
-        {"key": "statements", "title": "Statements imported", "done": not gaps,
-         "count": f"{n_accounts - len(gaps)} of {n_accounts}", "href": "/statements", "action": "Import",
-         "detail": "; ".join(g["text"] for g in gaps) + "." if gaps else "Every account covers the month.", "gaps": gaps},
+        {"key": "statements", "title": "Statements imported", "done": not open_gaps,
+         "count": f"{n_accounts - len(open_gaps)} of {n_accounts}", "href": "/statements", "action": "Import",
+         "detail": "; ".join(g["text"] for g in open_gaps) + "." if open_gaps else "Every account covers the month.",
+         "gaps": gaps},
         {"key": "categorise", "title": "Categorise", "done": uncat_n == 0,
          "count": f"{uncat_n} left" if uncat_n else "none left",
          "href": f"/transactions?month={month}&uncategorised=1", "action": f"File them ({uncat_n})" if uncat_n else "Open",

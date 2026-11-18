@@ -81,12 +81,15 @@ def day_label(iso: str | None) -> str:
 # ------------------------------------------------------------- period choice
 def period_months(conn: sqlite3.Connection, n: int, include_partial: bool) -> tuple[list[str], list[dict]]:
     """The last n usable months. A month counts as usable when every spending account covers at least part of it
-    and it is complete, closed on Review (the household has signed it off, gaps and all), or gaps are allowed."""
+    and it is complete, closed on Review (the household has signed it off, gaps and all), or gaps are allowed.
+    A month closed while waiting on an account's next statement stays partial until that statement is imported."""
     cov = reports.month_coverage(conn)
-    closed = set(review.closed_months(conn))
+    awaiting = review.awaiting_months(conn)
+    closed = set(review.closed_months(conn)) - awaiting
     usable = [c for c in cov if c["covered"] and (include_partial or c["complete"] or c["month"] in closed)]
     chosen = [c["month"] for c in usable][-n:]
-    return chosen, [{**c, "closed": c["month"] in closed} for c in cov if c["month"] in chosen]
+    return chosen, [{**c, "closed": c["month"] in closed, "awaiting": c["month"] in awaiting}
+                    for c in cov if c["month"] in chosen]
 
 
 # ---------------------------------------------------------- table decoration
